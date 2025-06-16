@@ -33,6 +33,11 @@ function App() {
     confidence
   } = useSpeechRecognition();
 
+  // Sync recording state with speech recognition
+  useEffect(() => {
+    setIsRecording(isListening);
+  }, [isListening]);
+
   // Play welcome greeting
   useEffect(() => {
     const playWelcomeGreeting = async () => {
@@ -57,7 +62,7 @@ function App() {
 
   // Handle transcript changes
   useEffect(() => {
-    if (transcript && !isListening) {
+    if (transcript && !isListening && !isRecording) {
       handleUserMessage(transcript, confidence);
       setCurrentTranscript(transcript);
       resetTranscript();
@@ -67,7 +72,7 @@ function App() {
         setCurrentTranscript('');
       }, 3000);
     }
-  }, [transcript, isListening, confidence]);
+  }, [transcript, isListening, isRecording, confidence]);
 
   const handleUserMessage = async (userText: string, confidenceScore?: number) => {
     if (!userText.trim()) return;
@@ -105,7 +110,6 @@ function App() {
   };
 
   const handleVoiceStart = () => {
-    setIsRecording(true);
     setError(null);
     setCurrentTranscript('');
     
@@ -118,13 +122,12 @@ function App() {
   };
 
   const handleVoiceStop = () => {
-    setIsRecording(false);
-    stopListening();
-    
     // Haptic feedback on stop
     if ('vibrate' in navigator) {
       navigator.vibrate(30);
     }
+    
+    stopListening();
   };
 
   if (!browserSupportsSpeechRecognition) {
