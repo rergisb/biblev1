@@ -118,18 +118,18 @@ function App() {
         navigator.vibrate([50, 30, 50]);
       }
       
-      // Generate AI response using Gemini
+      // Generate AI response using Gemini - ONLY ONE CALL
       console.log('Sending to Gemini:', userText);
       const aiText = await generateGeminiResponse(userText);
       console.log('Gemini response:', aiText);
       
       setLastResponse(aiText);
       
-      // Convert AI response to speech
+      // Convert AI response to speech - ONLY ONE CALL
       console.log('Converting to speech...');
       const audioBuffer = await synthesizeSpeech(aiText);
       
-      // Auto-play response with haptic feedback
+      // Auto-play response with haptic feedback - ONLY ONE PLAYBACK
       if ('vibrate' in navigator) {
         navigator.vibrate([100, 50, 100]);
       }
