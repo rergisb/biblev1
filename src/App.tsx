@@ -25,6 +25,7 @@ function App() {
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [lastResponse, setLastResponse] = useState<string>('');
+  const [pendingTranscript, setPendingTranscript] = useState<string>('');
 
   const {
     transcript,
@@ -65,11 +66,35 @@ function App() {
     return () => clearTimeout(timer);
   }, [hasPlayedGreeting, browserSupportsSpeechRecognition]);
 
-  // Handle transcript changes
+  // Handle transcript changes - process immediately when we have a final transcript
   useEffect(() => {
-    if (transcript && !isListening && !isRecording) {
-      handleUserMessage(transcript, confidence);
-      setCurrentTranscript(transcript);
+    if (transcript && transcript.trim()) {
+      console.log('Transcript received:', transcript, 'isListening:', isListening);
+      
+      // If we're not listening anymore, process the transcript immediately
+      if (!isListening) {
+        handleUserMessage(transcript, confidence);
+        setCurrentTranscript(transcript);
+        resetTranscript();
+        
+        // Clear transcript after showing it briefly
+        setTimeout(() => {
+          setCurrentTranscript('');
+        }, 3000);
+      } else {
+        // Store the transcript while still listening
+        setPendingTranscript(transcript);
+      }
+    }
+  }, [transcript, isListening, confidence]);
+
+  // Handle when listening stops - process any pending transcript
+  useEffect(() => {
+    if (!isListening && pendingTranscript && pendingTranscript.trim()) {
+      console.log('Processing pending transcript:', pendingTranscript);
+      handleUserMessage(pendingTranscript, confidence);
+      setCurrentTranscript(pendingTranscript);
+      setPendingTranscript('');
       resetTranscript();
       
       // Clear transcript after showing it briefly
@@ -77,11 +102,12 @@ function App() {
         setCurrentTranscript('');
       }, 3000);
     }
-  }, [transcript, isListening, isRecording, confidence]);
+  }, [isListening, pendingTranscript, confidence]);
 
   const handleUserMessage = async (userText: string, confidenceScore?: number) => {
-    if (!userText.trim()) return;
+    if (!userText.trim() || isProcessing) return;
 
+    console.log('Processing user message:', userText);
     setIsProcessing(true);
     setError(null);
     setLastResponse('');
@@ -136,6 +162,7 @@ function App() {
     setError(null);
     setCurrentTranscript('');
     setLastResponse('');
+    setPendingTranscript('');
     
     // Haptic feedback on start
     if ('vibrate' in navigator) {
@@ -151,6 +178,7 @@ function App() {
       navigator.vibrate(30);
     }
     
+    console.log('Stopping voice recording...');
     stopListening();
   };
 
@@ -283,6 +311,9 @@ function App() {
                   <p className="text-emerald-300 font-medium">Listening...</p>
                 </div>
                 <p className="text-gray-400 text-sm">Share your heart or ask for guidance</p>
+                {pendingTranscript && (
+                  <p className="text-emerald-200 text-xs italic">"{pendingTranscript}"</p>
+                )}
               </div>
             ) : isProcessing ? (
               <div className="flex items-center justify-center gap-3">
