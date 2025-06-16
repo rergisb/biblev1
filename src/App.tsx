@@ -1,13 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, MessageCircle, History, User, Menu, X } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
-import { ChatMessage } from './components/ChatMessage';
-import { TypewriterText } from './components/TypewriterText';
-import { UserProfile } from './components/UserProfile';
-import { ChatHistory } from './components/ChatHistory';
-import { AIVoiceInput } from './components/ui/ai-voice-input';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
-import { useLocalStorage } from './hooks/useLocalStorage';
 import { synthesizeSpeech, playAudioBuffer } from './services/elevenLabsService';
 import { generateAIResponse } from './services/aiService';
 
@@ -20,26 +14,14 @@ interface Message {
   confidence?: number;
 }
 
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  timestamp: Date;
-}
-
 function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState<string | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
-  const [sessions, setSessions] = useLocalStorage<ChatSession[]>('chat-sessions', []);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [currentTranscript, setCurrentTranscript] = useState('');
 
   const {
     transcript,
@@ -58,7 +40,7 @@ function App() {
       
       try {
         setIsPlayingGreeting(true);
-        const greetingText = "Hello, touch your screen to start talking";
+        const greetingText = "Hello, I'm your voice assistant. Touch the button to start talking";
         const audioBuffer = await synthesizeSpeech(greetingText);
         await playAudioBuffer(audioBuffer);
         setHasPlayedGreeting(true);
@@ -69,7 +51,7 @@ function App() {
       }
     };
 
-    const timer = setTimeout(playWelcomeGreeting, 1000);
+    const timer = setTimeout(playWelcomeGreeting, 1500);
     return () => clearTimeout(timer);
   }, [hasPlayedGreeting, browserSupportsSpeechRecognition]);
 
@@ -77,76 +59,42 @@ function App() {
   useEffect(() => {
     if (transcript && !isListening) {
       handleUserMessage(transcript, confidence);
+      setCurrentTranscript(transcript);
       resetTranscript();
+      
+      // Clear transcript after showing it briefly
+      setTimeout(() => {
+        setCurrentTranscript('');
+      }, 3000);
     }
   }, [transcript, isListening, confidence]);
-
-  // Save current session
-  useEffect(() => {
-    if (messages.length > 0 && currentSessionId) {
-      const sessionIndex = sessions.findIndex(s => s.id === currentSessionId);
-      const updatedSession: ChatSession = {
-        id: currentSessionId,
-        title: messages[0]?.text.slice(0, 50) + '...' || 'New Conversation',
-        messages,
-        timestamp: new Date()
-      };
-
-      if (sessionIndex >= 0) {
-        const updatedSessions = [...sessions];
-        updatedSessions[sessionIndex] = updatedSession;
-        setSessions(updatedSessions);
-      } else {
-        setSessions([updatedSession, ...sessions]);
-      }
-    }
-  }, [messages, currentSessionId, sessions, setSessions]);
 
   const handleUserMessage = async (userText: string, confidenceScore?: number) => {
     if (!userText.trim()) return;
 
-    // Create new session if none exists
-    if (!currentSessionId) {
-      setCurrentSessionId(Date.now().toString());
-    }
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: userText,
-      isUser: true,
-      timestamp: new Date(),
-      confidence: confidenceScore
-    };
-
-    setMessages(prev => [...prev, userMessage]);
     setIsProcessing(true);
     setError(null);
 
     try {
+      // Add haptic feedback
+      if ('vibrate' in navigator) {
+        navigator.vibrate([50, 30, 50]);
+      }
+      
       // Simulate processing delay for better UX
       await new Promise(resolve => setTimeout(resolve, 300));
       
       const aiText = await generateAIResponse(userText);
       const audioBuffer = await synthesizeSpeech(aiText);
       
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: aiText,
-        isUser: false,
-        timestamp: new Date(),
-        audioBuffer
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-      
       // Auto-play response with haptic feedback
       if ('vibrate' in navigator) {
         navigator.vibrate([100, 50, 100]);
       }
       
-      setIsPlayingAudio(aiMessage.id);
+      setIsPlayingAudio(true);
       await playAudioBuffer(audioBuffer);
-      setIsPlayingAudio(null);
+      setIsPlayingAudio(false);
       
     } catch (error) {
       console.error('Error processing message:', error);
@@ -156,49 +104,39 @@ function App() {
     }
   };
 
-  const handlePlayAudio = async (messageId: string, audioBuffer: ArrayBuffer) => {
-    if (isPlayingAudio) return;
-    
-    try {
-      setIsPlayingAudio(messageId);
-      await playAudioBuffer(audioBuffer);
-    } catch (error) {
-      console.error('Error playing audio:', error);
-    } finally {
-      setIsPlayingAudio(null);
-    }
-  };
-
-  const startNewSession = () => {
-    setMessages([]);
-    setCurrentSessionId(null);
-    setError(null);
-  };
-
-  const loadSession = (session: ChatSession) => {
-    setMessages(session.messages);
-    setCurrentSessionId(session.id);
-    setShowHistory(false);
-    setError(null);
-  };
-
   const handleVoiceStart = () => {
     setIsRecording(true);
+    setError(null);
+    setCurrentTranscript('');
+    
+    // Haptic feedback on start
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+    
     startListening();
   };
 
-  const handleVoiceStop = (duration: number) => {
+  const handleVoiceStop = () => {
     setIsRecording(false);
     stopListening();
+    
+    // Haptic feedback on stop
+    if ('vibrate' in navigator) {
+      navigator.vibrate(30);
+    }
   };
 
   if (!browserSupportsSpeechRecognition) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
-        <div className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl border border-white/20 shadow-2xl">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 flex items-center justify-center p-6">
+        <div className="bg-black/30 backdrop-blur-xl p-8 rounded-3xl border border-emerald-500/20 shadow-2xl text-center max-w-md">
+          <div className="w-16 h-16 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <MicOff className="w-8 h-8 text-white" />
+          </div>
           <h1 className="text-2xl font-bold text-white mb-4">Browser Not Supported</h1>
-          <p className="text-gray-300">
-            Your browser doesn't support speech recognition. Please use Chrome, Safari, or another modern browser.
+          <p className="text-gray-300 leading-relaxed">
+            Your browser doesn't support speech recognition. Please use Chrome, Safari, or another modern browser to experience the voice assistant.
           </p>
         </div>
       </div>
@@ -206,93 +144,157 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
-      {/* Animated Background */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 text-white overflow-hidden">
+      {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#0067D2]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-400/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
       </div>
 
-      {/* Main Content */}
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-screen justify-center">
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl max-w-md mx-auto">
-            <p className="text-red-200 text-sm text-center">{error}</p>
+      {/* Main Content Container */}
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-6">
+        
+        {/* Central Visualizer Area */}
+        <div className="flex-1 flex items-center justify-center w-full max-w-md">
+          <div className="relative">
+            {/* Main Visualizer */}
+            <VoiceVisualizer
+              isRecording={isRecording}
+              isPlaying={isPlayingAudio || isPlayingGreeting}
+              audioLevel={isRecording ? 0.8 : isPlayingAudio ? 0.6 : 0.1}
+            />
+            
+            {/* Central Status Indicator */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
+                isRecording 
+                  ? 'bg-emerald-500/20 shadow-lg shadow-emerald-500/30' 
+                  : isPlayingAudio || isPlayingGreeting
+                  ? 'bg-teal-500/20 shadow-lg shadow-teal-500/30'
+                  : 'bg-gray-500/10'
+              }`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isRecording 
+                    ? 'bg-emerald-500/30 animate-pulse' 
+                    : isPlayingAudio || isPlayingGreeting
+                    ? 'bg-teal-500/30 animate-pulse'
+                    : 'bg-gray-500/20'
+                }`}>
+                  <Mic className={`w-8 h-8 transition-colors duration-300 ${
+                    isRecording 
+                      ? 'text-emerald-300' 
+                      : isPlayingAudio || isPlayingGreeting
+                      ? 'text-teal-300'
+                      : 'text-gray-400'
+                  }`} />
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-
-        {/* Voice Interface */}
-        <AIVoiceInput
-          onStart={handleVoiceStart}
-          onStop={handleVoiceStop}
-          visualizerBars={48}
-          className="bg-black/20 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl"
-        />
-
-        {/* Status Display */}
-        <div className="text-center mt-6">
-          {isPlayingGreeting ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
-              <p className="text-[#0067D2] font-medium">Neural interface initializing...</p>
-            </div>
-          ) : isRecording ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-              <p className="text-red-400 font-medium">Listening... Speak now</p>
-            </div>
-          ) : transcript ? (
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10 max-w-2xl mx-auto">
-              <p className="text-gray-300">
-                <span className="text-[#0067D2] font-medium">Recognized:</span> "{transcript}"
-                {confidence && (
-                  <span className="text-xs text-gray-500 ml-2">
-                    ({Math.round(confidence * 100)}% confidence)
-                  </span>
-                )}
-              </p>
-            </div>
-          ) : null}
         </div>
 
-        {/* Processing Indicator */}
-        {isProcessing && (
-          <div className="flex items-center justify-center mt-6">
-            <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm px-6 py-3 rounded-full border border-white/10">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+        {/* Status Text Area */}
+        <div className="w-full max-w-md space-y-4 mb-8">
+          {/* Error Display */}
+          {error && (
+            <div className="p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl">
+              <p className="text-red-200 text-sm text-center">{error}</p>
+            </div>
+          )}
+
+          {/* Status Messages */}
+          <div className="text-center min-h-[60px] flex items-center justify-center">
+            {isPlayingGreeting ? (
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
+                <p className="text-teal-300 font-medium">Initializing voice assistant...</p>
               </div>
-              <span className="text-sm text-gray-300">Processing neural patterns...</span>
-            </div>
+            ) : isRecording ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <p className="text-emerald-300 font-medium">Listening...</p>
+                </div>
+                <p className="text-gray-400 text-sm">Speak naturally</p>
+              </div>
+            ) : isProcessing ? (
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-teal-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+                <span className="text-teal-300 font-medium">Processing...</span>
+              </div>
+            ) : isPlayingAudio ? (
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
+                <span className="text-teal-300 font-medium">🔊 Speaking...</span>
+              </div>
+            ) : currentTranscript ? (
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-emerald-500/20">
+                <p className="text-gray-300 text-center">
+                  <span className="text-emerald-400 font-medium">You said:</span>
+                </p>
+                <p className="text-white mt-1 text-center">"{currentTranscript}"</p>
+                {confidence && (
+                  <p className="text-xs text-gray-500 text-center mt-1">
+                    {Math.round(confidence * 100)}% confidence
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-gray-300 font-medium mb-1">Ready to assist</p>
+                <p className="text-gray-500 text-sm">Touch the button below to speak</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Audio Playing Indicator */}
-        {isPlayingAudio && (
-          <div className="mt-6 flex items-center justify-center">
-            <div className="flex items-center gap-3 bg-[#0067D2]/20 backdrop-blur-sm px-6 py-3 rounded-full border border-[#0067D2]/30">
-              <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
-              <span className="text-sm text-[#0067D2] font-medium">🔊 Playing response...</span>
+        {/* Main Interaction Button */}
+        <div className="relative">
+          <button
+            onClick={isRecording ? handleVoiceStop : handleVoiceStart}
+            disabled={isProcessing || isPlayingAudio || isPlayingGreeting}
+            className={`relative w-20 h-20 rounded-full transition-all duration-300 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+              isRecording
+                ? 'bg-gradient-to-r from-red-500 to-red-600 shadow-lg shadow-red-500/30 hover:shadow-red-500/40'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/40 hover:scale-105'
+            }`}
+            aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+          >
+            {/* Glow Effect */}
+            <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
+              isRecording
+                ? 'bg-red-500/20 animate-ping'
+                : 'bg-emerald-500/20'
+            }`}></div>
+            
+            {/* Button Content */}
+            <div className="relative z-10 w-full h-full flex items-center justify-center">
+              {isRecording ? (
+                <div className="w-6 h-6 bg-white rounded-sm"></div>
+              ) : (
+                <Mic className="w-8 h-8 text-white" />
+              )}
             </div>
-          </div>
-        )}
-      </main>
+          </button>
 
-      {/* Modals */}
-      <UserProfile isOpen={showProfile} onClose={() => setShowProfile(false)} />
-      <ChatHistory 
-        isOpen={showHistory} 
-        onClose={() => setShowHistory(false)}
-        sessions={sessions}
-        onLoadSession={loadSession}
-        onDeleteSession={(sessionId) => {
-          setSessions(sessions.filter(s => s.id !== sessionId));
-        }}
-      />
+          {/* Pulse Ring for Active States */}
+          {(isRecording || isPlayingAudio) && (
+            <div className={`absolute inset-0 rounded-full animate-ping ${
+              isRecording 
+                ? 'bg-red-500/30' 
+                : 'bg-teal-500/30'
+            }`}></div>
+          )}
+        </div>
+
+        {/* Bottom Spacing */}
+        <div className="h-8"></div>
+      </div>
     </div>
   );
 }

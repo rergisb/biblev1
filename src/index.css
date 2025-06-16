@@ -54,7 +54,7 @@
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #0067D2;
+  outline: 2px solid #10B981;
   outline-offset: 2px;
 }
 
@@ -84,4 +84,36 @@ textarea:focus-visible {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Enhanced button interactions */
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Smooth animations for better mobile experience */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure proper touch targets */
+button, [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Custom pulse animation for better performance */
+@keyframes custom-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-custom-pulse {
+  animation: custom-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
