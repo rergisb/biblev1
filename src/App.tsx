@@ -27,6 +27,10 @@ function App() {
   const [lastResponse, setLastResponse] = useState<string>('');
   const [pendingTranscript, setPendingTranscript] = useState<string>('');
 
+  // Add ref to track if we're currently processing to prevent duplicates
+  const processingRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const {
     transcript,
     isListening,
@@ -105,12 +109,24 @@ function App() {
   }, [isListening, pendingTranscript, confidence]);
 
   const handleUserMessage = async (userText: string, confidenceScore?: number) => {
-    if (!userText.trim() || isProcessing) return;
+    if (!userText.trim() || processingRef.current) {
+      console.log('Skipping message - empty or already processing');
+      return;
+    }
 
     console.log('Processing user message:', userText);
+    
+    // Set processing flag to prevent duplicates
+    processingRef.current = true;
     setIsProcessing(true);
     setError(null);
     setLastResponse('');
+
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
 
     try {
       // Add haptic feedback
@@ -118,25 +134,55 @@ function App() {
         navigator.vibrate([50, 30, 50]);
       }
       
-      // Generate AI response using Gemini - ONLY ONE CALL
+      // Generate AI response using Gemini - SINGLE CALL
       console.log('Sending to Gemini:', userText);
       const aiText = await generateGeminiResponse(userText);
       console.log('Gemini response:', aiText);
       
       setLastResponse(aiText);
       
-      // Convert AI response to speech - ONLY ONE CALL
+      // Convert AI response to speech - SINGLE CALL
       console.log('Converting to speech...');
       const audioBuffer = await synthesizeSpeech(aiText);
       
-      // Auto-play response with haptic feedback - ONLY ONE PLAYBACK
+      // Auto-play response with haptic feedback - SINGLE PLAYBACK
       if ('vibrate' in navigator) {
         navigator.vibrate([100, 50, 100]);
       }
       
       setIsPlayingAudio(true);
-      await playAudioBuffer(audioBuffer);
-      setIsPlayingAudio(false);
+      
+      // Use a promise-based approach to ensure single playback
+      await new Promise<void>((resolve, reject) => {
+        try {
+          const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          
+          // Store reference to current audio
+          audioRef.current = audio;
+          
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            setIsPlayingAudio(false);
+            resolve();
+          };
+          
+          audio.onerror = (error) => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            setIsPlayingAudio(false);
+            reject(error);
+          };
+          
+          // Ensure only one audio plays
+          audio.play().catch(reject);
+        } catch (error) {
+          setIsPlayingAudio(false);
+          reject(error);
+        }
+      });
       
     } catch (error) {
       console.error('Error processing message:', error);
@@ -154,6 +200,7 @@ function App() {
         setError('Connection error. Please check your network and try again.');
       }
     } finally {
+      processingRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -163,6 +210,13 @@ function App() {
     setCurrentTranscript('');
     setLastResponse('');
     setPendingTranscript('');
+    
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setIsPlayingAudio(false);
+    }
     
     // Haptic feedback on start
     if ('vibrate' in navigator) {
@@ -193,6 +247,16 @@ function App() {
       }
     }
   };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   if (!browserSupportsSpeechRecognition) {
     return (
