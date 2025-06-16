@@ -45,7 +45,7 @@ function App() {
       
       try {
         setIsPlayingGreeting(true);
-        const greetingText = "Hello, I'm your voice assistant. Touch the button to start talking";
+        const greetingText = "Hello, what do you wanna do today? Read a bible verse, or get a bible advice to help you with something. Tap anywhere in the screen to kickoff the conversation.";
         const audioBuffer = await synthesizeSpeech(greetingText);
         await playAudioBuffer(audioBuffer);
         setHasPlayedGreeting(true);
@@ -130,6 +130,18 @@ function App() {
     stopListening();
   };
 
+  // Handle tap anywhere to start conversation
+  const handleScreenTap = (e: React.MouseEvent) => {
+    // Only trigger if not already recording/processing and not clicking the button
+    if (!isRecording && !isProcessing && !isPlayingAudio && !isPlayingGreeting) {
+      const target = e.target as HTMLElement;
+      // Don't trigger if clicking the actual button
+      if (!target.closest('button')) {
+        handleVoiceStart();
+      }
+    }
+  };
+
   if (!browserSupportsSpeechRecognition) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 flex items-center justify-center p-6">
@@ -147,7 +159,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 text-white overflow-hidden">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 text-white overflow-hidden cursor-pointer"
+      onClick={handleScreenTap}
+    >
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -211,7 +226,7 @@ function App() {
             {isPlayingGreeting ? (
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
-                <p className="text-teal-300 font-medium">Initializing voice assistant...</p>
+                <p className="text-teal-300 font-medium">Welcome to your Bible companion...</p>
               </div>
             ) : isRecording ? (
               <div className="space-y-2">
@@ -249,8 +264,9 @@ function App() {
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-gray-300 font-medium mb-1">Ready to assist</p>
-                <p className="text-gray-500 text-sm">Touch the button below to speak</p>
+                <p className="text-gray-300 font-medium mb-2">Ready for Bible guidance</p>
+                <p className="text-gray-400 text-sm mb-1">Ask for a verse or spiritual advice</p>
+                <p className="text-gray-500 text-xs">Tap anywhere to start speaking</p>
               </div>
             )}
           </div>
