@@ -4,7 +4,7 @@ import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ApiConfigModal } from './components/ApiConfigModal';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { synthesizeSpeech, playAudioBuffer } from './services/elevenLabsService';
-import { generateAIResponse } from './services/aiService';
+import { generateGeminiResponse } from './services/geminiService';
 
 interface Message {
   id: string;
@@ -24,6 +24,7 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [showApiConfig, setShowApiConfig] = useState(false);
+  const [lastResponse, setLastResponse] = useState<string>('');
 
   const {
     transcript,
@@ -53,6 +54,8 @@ function App() {
         setHasPlayedGreeting(true);
       } catch (error) {
         console.error('Error playing welcome greeting:', error);
+        // Don't show error for greeting, just mark as played
+        setHasPlayedGreeting(true);
       } finally {
         setIsPlayingGreeting(false);
       }
@@ -81,6 +84,7 @@ function App() {
 
     setIsProcessing(true);
     setError(null);
+    setLastResponse('');
 
     try {
       // Add haptic feedback
@@ -88,10 +92,15 @@ function App() {
         navigator.vibrate([50, 30, 50]);
       }
       
-      // Simulate processing delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Generate AI response using Gemini
+      console.log('Sending to Gemini:', userText);
+      const aiText = await generateGeminiResponse(userText);
+      console.log('Gemini response:', aiText);
       
-      const aiText = await generateAIResponse(userText);
+      setLastResponse(aiText);
+      
+      // Convert AI response to speech
+      console.log('Converting to speech...');
       const audioBuffer = await synthesizeSpeech(aiText);
       
       // Auto-play response with haptic feedback
@@ -105,7 +114,19 @@ function App() {
       
     } catch (error) {
       console.error('Error processing message:', error);
-      setError('Connection error. Please check your network and try again.');
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('Gemini')) {
+          setError('Unable to connect to AI service. Please check your internet connection and try again.');
+        } else if (error.message.includes('ElevenLabs') || error.message.includes('speech')) {
+          setError('Voice synthesis error. Please check your ElevenLabs configuration in settings.');
+        } else {
+          setError('Something went wrong. Please try again.');
+        }
+      } else {
+        setError('Connection error. Please check your network and try again.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -114,6 +135,7 @@ function App() {
   const handleVoiceStart = () => {
     setError(null);
     setCurrentTranscript('');
+    setLastResponse('');
     
     // Haptic feedback on start
     if ('vibrate' in navigator) {
@@ -237,6 +259,16 @@ function App() {
             </div>
           )}
 
+          {/* AI Response Display */}
+          {lastResponse && !isProcessing && !isPlayingAudio && (
+            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-teal-500/20">
+              <p className="text-gray-300 text-center mb-2">
+                <span className="text-teal-400 font-medium">Bible Companion:</span>
+              </p>
+              <p className="text-white text-sm text-center leading-relaxed">"{lastResponse}"</p>
+            </div>
+          )}
+
           {/* Status Messages */}
           <div className="text-center min-h-[60px] flex items-center justify-center">
             {isPlayingGreeting ? (
@@ -250,7 +282,7 @@ function App() {
                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                   <p className="text-emerald-300 font-medium">Listening...</p>
                 </div>
-                <p className="text-gray-400 text-sm">Speak naturally</p>
+                <p className="text-gray-400 text-sm">Share your heart or ask for guidance</p>
               </div>
             ) : isProcessing ? (
               <div className="flex items-center justify-center gap-3">
@@ -259,12 +291,12 @@ function App() {
                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                   <div className="w-2 h-2 bg-teal-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
-                <span className="text-teal-300 font-medium">Processing...</span>
+                <span className="text-teal-300 font-medium">Seeking wisdom...</span>
               </div>
             ) : isPlayingAudio ? (
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
-                <span className="text-teal-300 font-medium">🔊 Speaking...</span>
+                <span className="text-teal-300 font-medium">🔊 Speaking God's word...</span>
               </div>
             ) : currentTranscript ? (
               <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-emerald-500/20">
