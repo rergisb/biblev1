@@ -51,11 +51,6 @@ function App() {
     confidence
   } = useSpeechRecognition();
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentResponse]);
-
   // Play welcome greeting
   useEffect(() => {
     const playWelcomeGreeting = async () => {
@@ -275,66 +270,22 @@ function App() {
 
       {/* Main Content */}
       <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-[calc(100vh-88px)]">
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto mb-6 space-y-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          {messages.length === 0 && !isTyping ? (
-            <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-[#0067D2]/40 animate-pulse">
-                <Mic className="w-12 h-12 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-4">
-                {isPlayingGreeting ? "Welcome to Neural Assistant" : "Ready to Assist"}
-              </h2>
-              <p className="text-gray-400 max-w-md mx-auto text-lg leading-relaxed">
-                {isPlayingGreeting 
-                  ? "🔊 Initializing voice interface..." 
-                  : "Touch the pulse button below and speak naturally. I'll understand and respond with human-like conversation."
-                }
-              </p>
+        {/* Welcome Screen */}
+        <div className="flex-1 flex items-center justify-center mb-6">
+          <div className="text-center py-16">
+            <div className="w-24 h-24 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-[#0067D2]/40 animate-pulse">
+              <Mic className="w-12 h-12 text-white" />
             </div>
-          ) : (
-            <>
-              {messages.map((message) => (
-                <ChatMessage
-                  key={message.id}
-                  message={message.text}
-                  isUser={message.isUser}
-                  timestamp={message.timestamp}
-                  confidence={message.confidence}
-                  onPlayAudio={
-                    message.audioBuffer
-                      ? () => handlePlayAudio(message.id, message.audioBuffer!)
-                      : undefined
-                  }
-                  isPlaying={isPlayingAudio === message.id}
-                />
-              ))}
-              
-              {/* Typing Indicator */}
-              {isTyping && currentResponse && (
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 mr-16">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <MessageCircle className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-gray-300">Neural Assistant</span>
-                        <div className="flex gap-1">
-                          <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        </div>
-                      </div>
-                      <TypewriterText text={currentResponse} speed={50} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          
-          <div ref={messagesEndRef} />
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-4">
+              {isPlayingGreeting ? "Welcome to Neural Assistant" : "Ready to Assist"}
+            </h2>
+            <p className="text-gray-400 max-w-md mx-auto text-lg leading-relaxed">
+              {isPlayingGreeting 
+                ? "🔊 Initializing voice interface..." 
+                : "Touch the pulse button below and speak naturally. I'll understand and respond with human-like conversation."
+              }
+            </p>
+          </div>
         </div>
 
         {/* Error Display */}
