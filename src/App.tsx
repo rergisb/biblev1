@@ -5,6 +5,7 @@ import { ChatMessage } from './components/ChatMessage';
 import { TypewriterText } from './components/TypewriterText';
 import { UserProfile } from './components/UserProfile';
 import { ChatHistory } from './components/ChatHistory';
+import { AIVoiceInput } from './components/ui/ai-voice-input';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { synthesizeSpeech, playAudioBuffer } from './services/elevenLabsService';
@@ -39,6 +40,7 @@ function App() {
   const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
   const [sessions, setSessions] = useLocalStorage<ChatSession[]>('chat-sessions', []);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -50,6 +52,11 @@ function App() {
     browserSupportsSpeechRecognition,
     confidence
   } = useSpeechRecognition();
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, currentResponse]);
 
   // Play welcome greeting
   useEffect(() => {
@@ -196,12 +203,14 @@ function App() {
     setIsTyping(false);
   };
 
-  const toggleRecording = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
+  const handleVoiceStart = () => {
+    setIsRecording(true);
+    startListening();
+  };
+
+  const handleVoiceStop = (duration: number) => {
+    setIsRecording(false);
+    stopListening();
   };
 
   if (!browserSupportsSpeechRecognition) {
@@ -267,6 +276,8 @@ function App() {
               </div>
             </div>
           )}
+          
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Error Display */}
@@ -276,86 +287,53 @@ function App() {
           </div>
         )}
 
-        {/* Voice Interface */}
-        <div className="bg-black/20 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
-          {/* Voice Visualizer */}
-          <div className="mb-8">
-            <VoiceVisualizer
-              isRecording={isListening}
-              isPlaying={isPlayingAudio !== null || isPlayingGreeting}
-              audioLevel={isListening ? 0.8 : 0}
-            />
-          </div>
+        {/* Voice Interface - Replace the old interface with the new AI Voice Input */}
+        <AIVoiceInput
+          onStart={handleVoiceStart}
+          onStop={handleVoiceStop}
+          visualizerBars={48}
+          className="bg-black/20 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl"
+        />
 
-          {/* Status Display */}
-          <div className="text-center mb-8">
-            {isPlayingGreeting ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
-                <p className="text-[#0067D2] font-medium">Neural interface initializing...</p>
-              </div>
-            ) : isListening ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                <p className="text-red-400 font-medium">Listening... Speak now</p>
-              </div>
-            ) : transcript ? (
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-                <p className="text-gray-300">
-                  <span className="text-[#0067D2] font-medium">Recognized:</span> "{transcript}"
-                  {confidence && (
-                    <span className="text-xs text-gray-500 ml-2">
-                      ({Math.round(confidence * 100)}% confidence)
-                    </span>
-                  )}
-                </p>
-              </div>
-            ) : (
-              <p className="text-gray-400">Touch the neural interface to begin conversation</p>
-            )}
-          </div>
-
-          {/* Voice Control Button */}
-          <div className="flex justify-center">
-            <button
-              onClick={toggleRecording}
-              disabled={isProcessing || isPlayingGreeting}
-              className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 transform hover:scale-110 active:scale-95 ${
-                isListening
-                  ? 'bg-gradient-to-r from-red-500 to-pink-500 shadow-2xl shadow-red-500/50 animate-pulse'
-                  : 'bg-gradient-to-r from-[#0067D2] to-purple-500 shadow-2xl shadow-[#0067D2]/50 hover:shadow-[#0067D2]/70'
-              } ${(isProcessing || isPlayingGreeting) ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {/* Pulse rings */}
-              {isListening && (
-                <>
-                  <div className="absolute inset-0 rounded-full bg-red-500/30 animate-ping"></div>
-                  <div className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" style={{ animationDelay: '0.5s' }}></div>
-                </>
-              )}
-              
-              {isListening ? (
-                <MicOff className="w-10 h-10 text-white relative z-10" />
-              ) : (
-                <Mic className="w-10 h-10 text-white relative z-10" />
-              )}
-            </button>
-          </div>
-
-          {/* Processing Indicator */}
-          {isProcessing && (
-            <div className="flex items-center justify-center mt-6">
-              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm px-6 py-3 rounded-full border border-white/10">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                </div>
-                <span className="text-sm text-gray-300">Processing neural patterns...</span>
-              </div>
+        {/* Status Display */}
+        <div className="text-center mt-4">
+          {isPlayingGreeting ? (
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
+              <p className="text-[#0067D2] font-medium">Neural interface initializing...</p>
             </div>
-          )}
+          ) : isRecording ? (
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+              <p className="text-red-400 font-medium">Listening... Speak now</p>
+            </div>
+          ) : transcript ? (
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+              <p className="text-gray-300">
+                <span className="text-[#0067D2] font-medium">Recognized:</span> "{transcript}"
+                {confidence && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    ({Math.round(confidence * 100)}% confidence)
+                  </span>
+                )}
+              </p>
+            </div>
+          ) : null}
         </div>
+
+        {/* Processing Indicator */}
+        {isProcessing && (
+          <div className="flex items-center justify-center mt-6">
+            <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm px-6 py-3 rounded-full border border-white/10">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+              <span className="text-sm text-gray-300">Processing neural patterns...</span>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Modals */}
