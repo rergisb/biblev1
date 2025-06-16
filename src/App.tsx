@@ -34,8 +34,6 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [currentResponse, setCurrentResponse] = useState<string>('');
-  const [isTyping, setIsTyping] = useState(false);
   const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
   const [sessions, setSessions] = useLocalStorage<ChatSession[]>('chat-sessions', []);
@@ -122,7 +120,6 @@ function App() {
 
     setMessages(prev => [...prev, userMessage]);
     setIsProcessing(true);
-    setIsTyping(true);
     setError(null);
 
     try {
@@ -130,11 +127,6 @@ function App() {
       await new Promise(resolve => setTimeout(resolve, 300));
       
       const aiText = await generateAIResponse(userText);
-      setCurrentResponse(aiText);
-      
-      // Wait for typewriter effect to complete
-      await new Promise(resolve => setTimeout(resolve, aiText.length * 50 + 1000));
-      
       const audioBuffer = await synthesizeSpeech(aiText);
       
       const aiMessage: Message = {
@@ -146,8 +138,6 @@ function App() {
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      setCurrentResponse('');
-      setIsTyping(false);
       
       // Auto-play response with haptic feedback
       if ('vibrate' in navigator) {
@@ -161,8 +151,6 @@ function App() {
     } catch (error) {
       console.error('Error processing message:', error);
       setError('Connection error. Please check your network and try again.');
-      setIsTyping(false);
-      setCurrentResponse('');
     } finally {
       setIsProcessing(false);
     }
@@ -185,8 +173,6 @@ function App() {
     setMessages([]);
     setCurrentSessionId(null);
     setError(null);
-    setCurrentResponse('');
-    setIsTyping(false);
   };
 
   const loadSession = (session: ChatSession) => {
@@ -194,8 +180,6 @@ function App() {
     setCurrentSessionId(session.id);
     setShowHistory(false);
     setError(null);
-    setCurrentResponse('');
-    setIsTyping(false);
   };
 
   const handleVoiceStart = () => {
@@ -284,24 +268,6 @@ function App() {
               </div>
               <span className="text-sm text-gray-300">Processing neural patterns...</span>
             </div>
-          </div>
-        )}
-
-        {/* Current AI Response Display (Audio-only feedback) */}
-        {isTyping && currentResponse && (
-          <div className="mt-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 max-w-2xl mx-auto">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-sm font-medium text-gray-300">Neural Assistant</span>
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              </div>
-            </div>
-            <TypewriterText text={currentResponse} speed={50} />
           </div>
         )}
 
