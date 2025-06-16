@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, MessageCircle, Trash2, Settings } from 'lucide-react';
+import { Mic, MicOff, MessageCircle, History, User, Menu, X } from 'lucide-react';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ChatMessage } from './components/ChatMessage';
-import { ApiTestModal } from './components/ApiTestModal';
+import { TypewriterText } from './components/TypewriterText';
+import { UserProfile } from './components/UserProfile';
+import { ChatHistory } from './components/ChatHistory';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { useLocalStorage } from './hooks/useLocalStorage';
 import { synthesizeSpeech, playAudioBuffer } from './services/elevenLabsService';
 import { generateAIResponse } from './services/aiService';
 
@@ -13,6 +16,14 @@ interface Message {
   isUser: boolean;
   timestamp: Date;
   audioBuffer?: ArrayBuffer;
+  confidence?: number;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  timestamp: Date;
 }
 
 function App() {
@@ -20,9 +31,14 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showApiTest, setShowApiTest] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [currentResponse, setCurrentResponse] = useState<string>('');
+  const [isTyping, setIsTyping] = useState(false);
   const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
+  const [sessions, setSessions] = useLocalStorage<ChatSession[]>('chat-sessions', []);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -31,10 +47,16 @@ function App() {
     startListening,
     stopListening,
     resetTranscript,
-    browserSupportsSpeechRecognition
+    browserSupportsSpeechRecognition,
+    confidence
   } = useSpeechRecognition();
 
-  // Play welcome greeting on page load
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, currentResponse]);
+
+  // Play welcome greeting
   useEffect(() => {
     const playWelcomeGreeting = async () => {
       if (hasPlayedGreeting || !browserSupportsSpeechRecognition) return;
@@ -47,47 +69,75 @@ function App() {
         setHasPlayedGreeting(true);
       } catch (error) {
         console.error('Error playing welcome greeting:', error);
-        // Don't show error to user for greeting, just log it
       } finally {
         setIsPlayingGreeting(false);
       }
     };
 
-    // Add a small delay to ensure the page is fully loaded
     const timer = setTimeout(playWelcomeGreeting, 1000);
     return () => clearTimeout(timer);
   }, [hasPlayedGreeting, browserSupportsSpeechRecognition]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
+  // Handle transcript changes
   useEffect(() => {
     if (transcript && !isListening) {
-      handleUserMessage(transcript);
+      handleUserMessage(transcript, confidence);
       resetTranscript();
     }
-  }, [transcript, isListening]);
+  }, [transcript, isListening, confidence]);
 
-  const handleUserMessage = async (userText: string) => {
+  // Save current session
+  useEffect(() => {
+    if (messages.length > 0 && currentSessionId) {
+      const sessionIndex = sessions.findIndex(s => s.id === currentSessionId);
+      const updatedSession: ChatSession = {
+        id: currentSessionId,
+        title: messages[0]?.text.slice(0, 50) + '...' || 'New Conversation',
+        messages,
+        timestamp: new Date()
+      };
+
+      if (sessionIndex >= 0) {
+        const updatedSessions = [...sessions];
+        updatedSessions[sessionIndex] = updatedSession;
+        setSessions(updatedSessions);
+      } else {
+        setSessions([updatedSession, ...sessions]);
+      }
+    }
+  }, [messages, currentSessionId, sessions, setSessions]);
+
+  const handleUserMessage = async (userText: string, confidenceScore?: number) => {
     if (!userText.trim()) return;
+
+    // Create new session if none exists
+    if (!currentSessionId) {
+      setCurrentSessionId(Date.now().toString());
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
       text: userText,
       isUser: true,
-      timestamp: new Date()
+      timestamp: new Date(),
+      confidence: confidenceScore
     };
 
     setMessages(prev => [...prev, userMessage]);
     setIsProcessing(true);
+    setIsTyping(true);
     setError(null);
 
     try {
-      // Generate AI response
-      const aiText = await generateAIResponse(userText);
+      // Simulate processing delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Generate audio for AI response
+      const aiText = await generateAIResponse(userText);
+      setCurrentResponse(aiText);
+      
+      // Wait for typewriter effect to complete
+      await new Promise(resolve => setTimeout(resolve, aiText.length * 50 + 1000));
+      
       const audioBuffer = await synthesizeSpeech(aiText);
       
       const aiMessage: Message = {
@@ -99,15 +149,23 @@ function App() {
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      setCurrentResponse('');
+      setIsTyping(false);
       
-      // Auto-play the AI response
+      // Auto-play response with haptic feedback
+      if ('vibrate' in navigator) {
+        navigator.vibrate([100, 50, 100]);
+      }
+      
       setIsPlayingAudio(aiMessage.id);
       await playAudioBuffer(audioBuffer);
       setIsPlayingAudio(null);
       
     } catch (error) {
       console.error('Error processing message:', error);
-      setError('Sorry, I encountered an error processing your message. Please check your API connection and try again.');
+      setError('Connection error. Please check your network and try again.');
+      setIsTyping(false);
+      setCurrentResponse('');
     } finally {
       setIsProcessing(false);
     }
@@ -126,9 +184,21 @@ function App() {
     }
   };
 
-  const clearMessages = () => {
+  const startNewSession = () => {
     setMessages([]);
+    setCurrentSessionId(null);
     setError(null);
+    setCurrentResponse('');
+    setIsTyping(false);
+  };
+
+  const loadSession = (session: ChatSession) => {
+    setMessages(session.messages);
+    setCurrentSessionId(session.id);
+    setShowHistory(false);
+    setError(null);
+    setCurrentResponse('');
+    setIsTyping(false);
   };
 
   const toggleRecording = () => {
@@ -139,28 +209,12 @@ function App() {
     }
   };
 
-  const replayGreeting = async () => {
-    if (isPlayingGreeting || isPlayingAudio) return;
-    
-    try {
-      setIsPlayingGreeting(true);
-      const greetingText = "Hello, touch your screen to start talking";
-      const audioBuffer = await synthesizeSpeech(greetingText);
-      await playAudioBuffer(audioBuffer);
-    } catch (error) {
-      console.error('Error replaying greeting:', error);
-      setError('Failed to play greeting. Please check your API connection.');
-    } finally {
-      setIsPlayingGreeting(false);
-    }
-  };
-
   if (!browserSupportsSpeechRecognition) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-emerald-100 flex items-center justify-center">
-        <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-white/20">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Browser Not Supported</h1>
-          <p className="text-gray-600">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl border border-white/20 shadow-2xl">
+          <h1 className="text-2xl font-bold text-white mb-4">Browser Not Supported</h1>
+          <p className="text-gray-300">
             Your browser doesn't support speech recognition. Please use Chrome, Safari, or another modern browser.
           </p>
         </div>
@@ -169,164 +223,219 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-emerald-100">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-white/20 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-emerald-500 rounded-xl flex items-center justify-center">
-              <MessageCircle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-800">Voice Assistant</h1>
-              <p className="text-sm text-gray-600">Powered by ElevenLabs</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={clearMessages}
-              className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
-              title="Clear conversation"
-            >
-              <Trash2 className="w-5 h-5 text-gray-600" />
-            </button>
-            <button 
-              onClick={() => setShowApiTest(true)}
-              className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
-              title="Test API connection"
-            >
-              <Settings className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#0067D2]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col h-[calc(100vh-88px)]">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto mb-6 space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mic className="w-8 h-8 text-white" />
+      {/* Header */}
+      <header className="relative z-10 bg-black/20 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-[#0067D2]/30">
+                <MessageCircle className="w-7 h-7 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Start a Conversation</h2>
-              <p className="text-gray-600 max-w-md mx-auto mb-4">
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                  Neural Assistant
+                </h1>
+                <p className="text-sm text-gray-400">AI-Powered Voice Interface</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowHistory(true)}
+                className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105 group"
+                title="Chat History"
+              >
+                <History className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
+              </button>
+              <button
+                onClick={() => setShowProfile(true)}
+                className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105 group"
+                title="User Profile"
+              >
+                <User className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
+              </button>
+              <button
+                onClick={startNewSession}
+                className="px-4 py-2 rounded-2xl bg-gradient-to-r from-[#0067D2] to-purple-500 hover:from-[#0052A3] hover:to-purple-600 transition-all duration-300 hover:scale-105 shadow-lg shadow-[#0067D2]/30"
+              >
+                <span className="text-sm font-medium">New Chat</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-[calc(100vh-88px)]">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto mb-6 space-y-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          {messages.length === 0 && !isTyping ? (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-[#0067D2]/40 animate-pulse">
+                <Mic className="w-12 h-12 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-4">
+                {isPlayingGreeting ? "Welcome to Neural Assistant" : "Ready to Assist"}
+              </h2>
+              <p className="text-gray-400 max-w-md mx-auto text-lg leading-relaxed">
                 {isPlayingGreeting 
-                  ? "🔊 Playing welcome message..." 
-                  : "Click the microphone button below to start talking. I'll listen to your voice and respond with natural speech."
+                  ? "🔊 Initializing voice interface..." 
+                  : "Touch the pulse button below and speak naturally. I'll understand and respond with human-like conversation."
                 }
               </p>
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  onClick={() => setShowApiTest(true)}
-                  className="text-purple-600 hover:text-purple-700 underline text-sm"
-                >
-                  Test API Connection
-                </button>
-                {hasPlayedGreeting && (
-                  <button
-                    onClick={replayGreeting}
-                    disabled={isPlayingGreeting}
-                    className="text-emerald-600 hover:text-emerald-700 underline text-sm disabled:opacity-50"
-                  >
-                    {isPlayingGreeting ? "Playing..." : "Replay Welcome Message"}
-                  </button>
-                )}
-              </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                message={message.text}
-                isUser={message.isUser}
-                timestamp={message.timestamp}
-                onPlayAudio={
-                  message.audioBuffer
-                    ? () => handlePlayAudio(message.id, message.audioBuffer!)
-                    : undefined
-                }
-                isPlaying={isPlayingAudio === message.id}
-              />
-            ))
+            <>
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message.text}
+                  isUser={message.isUser}
+                  timestamp={message.timestamp}
+                  confidence={message.confidence}
+                  onPlayAudio={
+                    message.audioBuffer
+                      ? () => handlePlayAudio(message.id, message.audioBuffer!)
+                      : undefined
+                  }
+                  isPlaying={isPlayingAudio === message.id}
+                />
+              ))}
+              
+              {/* Typing Indicator */}
+              {isTyping && currentResponse && (
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 mr-16">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <MessageCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-medium text-gray-300">Neural Assistant</span>
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                      </div>
+                      <TypewriterText text={currentResponse} speed={50} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-          {isProcessing && (
-            <div className="flex items-center justify-center py-4">
-              <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <span className="text-sm text-gray-600 ml-2">Processing...</span>
-              </div>
-            </div>
-          )}
+          
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Error Message */}
+        {/* Error Display */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-            <p className="text-red-600 text-sm">{error}</p>
-            <button
-              onClick={() => setShowApiTest(true)}
-              className="text-red-700 hover:text-red-800 underline text-sm mt-1"
-            >
-              Test API Connection
-            </button>
+          <div className="mb-6 p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl">
+            <p className="text-red-200 text-sm">{error}</p>
           </div>
         )}
 
-        {/* Voice Controls */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl">
+        {/* Voice Interface */}
+        <div className="bg-black/20 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl">
           {/* Voice Visualizer */}
-          <div className="mb-6">
+          <div className="mb-8">
             <VoiceVisualizer
               isRecording={isListening}
               isPlaying={isPlayingAudio !== null || isPlayingGreeting}
-              audioLevel={isListening ? 0.7 : 0}
+              audioLevel={isListening ? 0.8 : 0}
             />
           </div>
 
-          {/* Status */}
-          <div className="text-center mb-4">
+          {/* Status Display */}
+          <div className="text-center mb-8">
             {isPlayingGreeting ? (
-              <p className="text-emerald-600 font-medium">🔊 Welcome! Touch your screen to start talking</p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
+                <p className="text-[#0067D2] font-medium">Neural interface initializing...</p>
+              </div>
             ) : isListening ? (
-              <p className="text-red-600 font-medium">🎤 Listening... Speak now!</p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                <p className="text-red-400 font-medium">Listening... Speak now</p>
+              </div>
             ) : transcript ? (
-              <p className="text-gray-600">Recognized: "{transcript}"</p>
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                <p className="text-gray-300">
+                  <span className="text-[#0067D2] font-medium">Recognized:</span> "{transcript}"
+                  {confidence && (
+                    <span className="text-xs text-gray-500 ml-2">
+                      ({Math.round(confidence * 100)}% confidence)
+                    </span>
+                  )}
+                </p>
+              </div>
             ) : (
-              <p className="text-gray-600">Click the microphone to start speaking</p>
+              <p className="text-gray-400">Touch the neural interface to begin conversation</p>
             )}
           </div>
 
-          {/* Record Button */}
+          {/* Voice Control Button */}
           <div className="flex justify-center">
             <button
               onClick={toggleRecording}
               disabled={isProcessing || isPlayingGreeting}
-              className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+              className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 transform hover:scale-110 active:scale-95 ${
                 isListening
-                  ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/30'
-                  : 'bg-gradient-to-r from-purple-500 to-emerald-500 hover:from-purple-600 hover:to-emerald-600 shadow-lg shadow-purple-500/30'
+                  ? 'bg-gradient-to-r from-red-500 to-pink-500 shadow-2xl shadow-red-500/50 animate-pulse'
+                  : 'bg-gradient-to-r from-[#0067D2] to-purple-500 shadow-2xl shadow-[#0067D2]/50 hover:shadow-[#0067D2]/70'
               } ${(isProcessing || isPlayingGreeting) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
+              {/* Pulse rings */}
+              {isListening && (
+                <>
+                  <div className="absolute inset-0 rounded-full bg-red-500/30 animate-ping"></div>
+                  <div className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" style={{ animationDelay: '0.5s' }}></div>
+                </>
+              )}
+              
               {isListening ? (
-                <MicOff className="w-8 h-8 text-white" />
+                <MicOff className="w-10 h-10 text-white relative z-10" />
               ) : (
-                <Mic className="w-8 h-8 text-white" />
+                <Mic className="w-10 h-10 text-white relative z-10" />
               )}
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* API Test Modal */}
-      <ApiTestModal 
-        isOpen={showApiTest} 
-        onClose={() => setShowApiTest(false)} 
+          {/* Processing Indicator */}
+          {isProcessing && (
+            <div className="flex items-center justify-center mt-6">
+              <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm px-6 py-3 rounded-full border border-white/10">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+                <span className="text-sm text-gray-300">Processing neural patterns...</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Modals */}
+      <UserProfile isOpen={showProfile} onClose={() => setShowProfile(false)} />
+      <ChatHistory 
+        isOpen={showHistory} 
+        onClose={() => setShowHistory(false)}
+        sessions={sessions}
+        onLoadSession={loadSession}
+        onDeleteSession={(sessionId) => {
+          setSessions(sessions.filter(s => s.id !== sessionId));
+        }}
       />
     </div>
   );
