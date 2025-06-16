@@ -1,5 +1,4 @@
 const GEMINI_API_KEY = 'AIzaSyDBysJ2sXRj7I2OXIHakLF_fFiXmJrIxOQ';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent';
 
 export interface GeminiResponse {
   candidates: Array<{
@@ -15,6 +14,11 @@ export interface GeminiResponse {
       probability: string;
     }>;
   }>;
+  usageMetadata?: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+    totalTokenCount: number;
+  };
   promptFeedback?: {
     safetyRatings: Array<{
       category: string;
@@ -25,70 +29,51 @@ export interface GeminiResponse {
 
 export const generateGeminiResponse = async (userMessage: string): Promise<string> => {
   try {
-    // Create a Bible-focused system prompt
-    const systemPrompt = `You are a wise and compassionate Bible companion AI assistant. Your role is to:
+    // Create a Bible-focused system prompt similar to your example
+    const systemPrompt = `You are a compassionate and knowledgeable Bible companion. Use the following principles in responding to users:
 
-1. Provide biblical wisdom, verses, and spiritual guidance
-2. Answer questions about faith, Christianity, and biblical teachings
-3. Offer comfort and encouragement through scripture
-4. Help users understand biblical concepts and stories
-5. Suggest relevant Bible verses for different life situations
-6. Provide thoughtful, faith-based advice for personal struggles
+- Provide scriptural insights and references that support spiritual reflection and understanding.
+- Offer pastoral encouragement, wisdom, and comfort grounded in biblical principles.
+- Help users explore theological, historical, and literary context of Bible passages.
+- Be gentle and respectful in tone, encouraging personal growth and faith journeys.
+- Answer questions with a balance of direct support and prompts for deeper spiritual exploration.
+- Encourage prayerful and meditative reflection on the Word of God.
+- When appropriate, provide relevant Bible verses and explain them with clarity.
+- Keep responses suitable for voice synthesis (clear, natural speech patterns).
+- Keep responses concise but meaningful (1-3 sentences typically).
 
-Guidelines:
-- Always respond with love, compassion, and biblical wisdom
-- Include relevant Bible verses when appropriate (with book, chapter, and verse references)
-- Keep responses conversational and accessible
-- Be encouraging and supportive
-- If asked about non-biblical topics, gently redirect to spiritual matters
-- Responses should be suitable for voice synthesis (clear, natural speech patterns)
-- Keep responses concise but meaningful (1-3 sentences typically)
+User question: ${userMessage}`;
 
-User message: "${userMessage}"
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            {
+              text: systemPrompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 300,
+        topP: 0.8,
+        topK: 40
+      }
+    };
 
-Please provide a helpful, biblical response:`;
-
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    // Use the correct API endpoint from your example
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: systemPrompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 200,
-        },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ]
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data: GeminiResponse = await response.json();
@@ -97,7 +82,7 @@ Please provide a helpful, biblical response:`;
       throw new Error('No response generated from Gemini API');
     }
 
-    const generatedText = data.candidates[0].content.parts[0].text;
+    const generatedText = data.candidates[0]?.content?.parts?.[0]?.text;
     
     if (!generatedText) {
       throw new Error('Empty response from Gemini API');
@@ -129,21 +114,30 @@ Please provide a helpful, biblical response:`;
 
 export const testGeminiConnection = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            {
+              text: "Hello! Just testing the connection. Please respond with a brief greeting."
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 50,
+        topP: 0.8,
+        topK: 40
+      }
+    };
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: "Hello, this is a test message."
-          }]
-        }],
-        generationConfig: {
-          maxOutputTokens: 10,
-        }
-      })
+      body: JSON.stringify(requestBody)
     });
 
     return response.ok;
