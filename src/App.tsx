@@ -45,7 +45,7 @@ function App() {
       
       try {
         setIsPlayingGreeting(true);
-        const greetingText = "Hello, what do you wanna do today? Read a bible verse, or get a bible advice to help you with something. Tap anywhere in the screen to kickoff the conversation.";
+        const greetingText = "Hello there! Want to read a verse or get some Bible advice? Tap anywhere to start.";
         const audioBuffer = await synthesizeSpeech(greetingText);
         await playAudioBuffer(audioBuffer);
         setHasPlayedGreeting(true);
