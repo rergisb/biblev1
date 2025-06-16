@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Key, TestTube, CheckCircle, AlertCircle } from 'lucide-react';
-import { testApiConnection } from '../services/elevenLabsService';
+import { X, Settings, Key, TestTube, CheckCircle, AlertCircle, Volume2, Play, Square } from 'lucide-react';
+import { testApiConnection, synthesizeSpeech, playAudioBuffer } from '../services/elevenLabsService';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface ApiConfigModalProps {
@@ -35,6 +35,8 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
+  const [isPlayingTest, setIsPlayingTest] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,6 +69,40 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
       setConnectionStatus('error');
     } finally {
       setIsTestingConnection(false);
+    }
+  };
+
+  const handleTestVoice = async () => {
+    if (!tempConfig.apiKey.trim()) {
+      alert('Please enter your API key first');
+      return;
+    }
+
+    setIsTestingVoice(true);
+    setIsPlayingTest(true);
+
+    try {
+      // Temporarily update the service with test configuration
+      (window as any).TEMP_ELEVENLABS_KEY = tempConfig.apiKey;
+      
+      const testText = "Hello! This is a test of your Bible companion voice. May God's peace be with you today.";
+      
+      const audioBuffer = await synthesizeSpeech(
+        testText,
+        tempConfig.voiceId,
+        tempConfig.voiceSettings
+      );
+      
+      await playAudioBuffer(audioBuffer);
+      
+      // Clean up
+      delete (window as any).TEMP_ELEVENLABS_KEY;
+    } catch (error) {
+      console.error('Voice test failed:', error);
+      alert('Voice test failed. Please check your API key and settings.');
+    } finally {
+      setIsTestingVoice(false);
+      setIsPlayingTest(false);
     }
   };
 
@@ -179,7 +215,31 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
 
           {/* Voice Selection */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Voice Selection</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Voice Selection</h3>
+              <button
+                onClick={handleTestVoice}
+                disabled={isTestingVoice || !tempConfig.apiKey.trim()}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isPlayingTest 
+                    ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' 
+                    : 'bg-teal-500/20 text-teal-300 hover:bg-teal-500/30'
+                }`}
+              >
+                {isPlayingTest ? (
+                  <>
+                    <Square className="w-4 h-4" />
+                    Playing...
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="w-4 h-4" />
+                    {isTestingVoice ? 'Loading...' : 'Test Voice'}
+                  </>
+                )}
+              </button>
+            </div>
+            
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Choose Voice
@@ -195,6 +255,9 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select a voice and click "Test Voice" to hear how it sounds with your current settings
+              </p>
             </div>
           </div>
 
@@ -276,6 +339,14 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                   }`} />
                 </button>
               </div>
+            </div>
+            
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+              <p className="text-sm text-emerald-300 mb-2">💡 Voice Testing Tip</p>
+              <p className="text-xs text-gray-400">
+                Adjust the settings above and click "Test Voice" to hear how they affect the voice quality. 
+                The test will use a sample Bible-themed message to help you find the perfect voice for your spiritual companion.
+              </p>
             </div>
           </div>
         </div>
