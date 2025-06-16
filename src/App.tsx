@@ -53,11 +53,6 @@ function App() {
     confidence
   } = useSpeechRecognition();
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentResponse]);
-
   // Play welcome greeting
   useEffect(() => {
     const playWelcomeGreeting = async () => {
@@ -236,58 +231,33 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-screen">
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto mb-6 space-y-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message.text}
-              isUser={message.isUser}
-              timestamp={message.timestamp}
-              confidence={message.confidence}
-              onPlayAudio={
-                message.audioBuffer
-                  ? () => handlePlayAudio(message.id, message.audioBuffer!)
-                  : undefined
-              }
-              isPlaying={isPlayingAudio === message.id}
-            />
-          ))}
-          
-          {/* Typing Indicator */}
-          {isTyping && currentResponse && (
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 mr-16">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <MessageCircle className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-300">Neural Assistant</span>
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                  <TypewriterText text={currentResponse} speed={50} />
-                </div>
-              </div>
+      <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-screen justify-center">
+        {/* Welcome Message - Only show when no conversation has started */}
+        {messages.length === 0 && !isProcessing && (
+          <div className="text-center mb-12">
+            <div className="w-24 h-24 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-[#0067D2]/40 animate-pulse">
+              <Mic className="w-12 h-12 text-white" />
             </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl">
-            <p className="text-red-200 text-sm">{error}</p>
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-4">
+              {isPlayingGreeting ? "Welcome to Neural Assistant" : "Ready to Assist"}
+            </h2>
+            <p className="text-gray-400 max-w-md mx-auto text-lg leading-relaxed">
+              {isPlayingGreeting 
+                ? "🔊 Initializing voice interface..." 
+                : "Touch the button below and speak naturally. I'll understand and respond with human-like conversation."
+              }
+            </p>
           </div>
         )}
 
-        {/* Voice Interface - Replace the old interface with the new AI Voice Input */}
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl max-w-md mx-auto">
+            <p className="text-red-200 text-sm text-center">{error}</p>
+          </div>
+        )}
+
+        {/* Voice Interface */}
         <AIVoiceInput
           onStart={handleVoiceStart}
           onStop={handleVoiceStop}
@@ -296,7 +266,7 @@ function App() {
         />
 
         {/* Status Display */}
-        <div className="text-center mt-4">
+        <div className="text-center mt-6">
           {isPlayingGreeting ? (
             <div className="flex items-center justify-center gap-2">
               <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
@@ -308,7 +278,7 @@ function App() {
               <p className="text-red-400 font-medium">Listening... Speak now</p>
             </div>
           ) : transcript ? (
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10 max-w-2xl mx-auto">
               <p className="text-gray-300">
                 <span className="text-[#0067D2] font-medium">Recognized:</span> "{transcript}"
                 {confidence && (
@@ -331,6 +301,34 @@ function App() {
                 <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
               <span className="text-sm text-gray-300">Processing neural patterns...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Current AI Response Display (Audio-only feedback) */}
+        {isTyping && currentResponse && (
+          <div className="mt-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 max-w-2xl mx-auto">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-full flex items-center justify-center">
+                <MessageCircle className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-sm font-medium text-gray-300">Neural Assistant</span>
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </div>
+            <TypewriterText text={currentResponse} speed={50} />
+          </div>
+        )}
+
+        {/* Audio Playing Indicator */}
+        {isPlayingAudio && (
+          <div className="mt-6 flex items-center justify-center">
+            <div className="flex items-center gap-3 bg-[#0067D2]/20 backdrop-blur-sm px-6 py-3 rounded-full border border-[#0067D2]/30">
+              <div className="w-2 h-2 bg-[#0067D2] rounded-full animate-pulse"></div>
+              <span className="text-sm text-[#0067D2] font-medium">🔊 Playing response...</span>
             </div>
           </div>
         )}
