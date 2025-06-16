@@ -21,6 +21,8 @@ function App() {
   const [isPlayingAudio, setIsPlayingAudio] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showApiTest, setShowApiTest] = useState(false);
+  const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
+  const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -31,6 +33,30 @@ function App() {
     resetTranscript,
     browserSupportsSpeechRecognition
   } = useSpeechRecognition();
+
+  // Play welcome greeting on page load
+  useEffect(() => {
+    const playWelcomeGreeting = async () => {
+      if (hasPlayedGreeting || !browserSupportsSpeechRecognition) return;
+      
+      try {
+        setIsPlayingGreeting(true);
+        const greetingText = "Hello, touch your screen to start talking";
+        const audioBuffer = await synthesizeSpeech(greetingText);
+        await playAudioBuffer(audioBuffer);
+        setHasPlayedGreeting(true);
+      } catch (error) {
+        console.error('Error playing welcome greeting:', error);
+        // Don't show error to user for greeting, just log it
+      } finally {
+        setIsPlayingGreeting(false);
+      }
+    };
+
+    // Add a small delay to ensure the page is fully loaded
+    const timer = setTimeout(playWelcomeGreeting, 1000);
+    return () => clearTimeout(timer);
+  }, [hasPlayedGreeting, browserSupportsSpeechRecognition]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,6 +139,22 @@ function App() {
     }
   };
 
+  const replayGreeting = async () => {
+    if (isPlayingGreeting || isPlayingAudio) return;
+    
+    try {
+      setIsPlayingGreeting(true);
+      const greetingText = "Hello, touch your screen to start talking";
+      const audioBuffer = await synthesizeSpeech(greetingText);
+      await playAudioBuffer(audioBuffer);
+    } catch (error) {
+      console.error('Error replaying greeting:', error);
+      setError('Failed to play greeting. Please check your API connection.');
+    } finally {
+      setIsPlayingGreeting(false);
+    }
+  };
+
   if (!browserSupportsSpeechRecognition) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-emerald-100 flex items-center justify-center">
@@ -171,14 +213,28 @@ function App() {
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Start a Conversation</h2>
               <p className="text-gray-600 max-w-md mx-auto mb-4">
-                Click the microphone button below to start talking. I'll listen to your voice and respond with natural speech.
+                {isPlayingGreeting 
+                  ? "🔊 Playing welcome message..." 
+                  : "Click the microphone button below to start talking. I'll listen to your voice and respond with natural speech."
+                }
               </p>
-              <button
-                onClick={() => setShowApiTest(true)}
-                className="text-purple-600 hover:text-purple-700 underline text-sm"
-              >
-                Test API Connection
-              </button>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={() => setShowApiTest(true)}
+                  className="text-purple-600 hover:text-purple-700 underline text-sm"
+                >
+                  Test API Connection
+                </button>
+                {hasPlayedGreeting && (
+                  <button
+                    onClick={replayGreeting}
+                    disabled={isPlayingGreeting}
+                    className="text-emerald-600 hover:text-emerald-700 underline text-sm disabled:opacity-50"
+                  >
+                    {isPlayingGreeting ? "Playing..." : "Replay Welcome Message"}
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             messages.map((message) => (
@@ -228,14 +284,16 @@ function App() {
           <div className="mb-6">
             <VoiceVisualizer
               isRecording={isListening}
-              isPlaying={isPlayingAudio !== null}
+              isPlaying={isPlayingAudio !== null || isPlayingGreeting}
               audioLevel={isListening ? 0.7 : 0}
             />
           </div>
 
           {/* Status */}
           <div className="text-center mb-4">
-            {isListening ? (
+            {isPlayingGreeting ? (
+              <p className="text-emerald-600 font-medium">🔊 Welcome! Touch your screen to start talking</p>
+            ) : isListening ? (
               <p className="text-red-600 font-medium">🎤 Listening... Speak now!</p>
             ) : transcript ? (
               <p className="text-gray-600">Recognized: "{transcript}"</p>
@@ -248,12 +306,12 @@ function App() {
           <div className="flex justify-center">
             <button
               onClick={toggleRecording}
-              disabled={isProcessing}
+              disabled={isProcessing || isPlayingGreeting}
               className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-105 active:scale-95 ${
                 isListening
                   ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/30'
                   : 'bg-gradient-to-r from-purple-500 to-emerald-500 hover:from-purple-600 hover:to-emerald-600 shadow-lg shadow-purple-500/30'
-              } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${(isProcessing || isPlayingGreeting) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {isListening ? (
                 <MicOff className="w-8 h-8 text-white" />
