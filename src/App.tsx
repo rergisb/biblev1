@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Settings } from 'lucide-react';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
+import { ApiConfigModal } from './components/ApiConfigModal';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { synthesizeSpeech, playAudioBuffer } from './services/elevenLabsService';
 import { generateAIResponse } from './services/aiService';
@@ -22,6 +23,7 @@ function App() {
   const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
+  const [showApiConfig, setShowApiConfig] = useState(false);
 
   const {
     transcript,
@@ -135,7 +137,7 @@ function App() {
     // Only trigger if not already recording/processing and not clicking the button
     if (!isRecording && !isProcessing && !isPlayingAudio && !isPlayingGreeting) {
       const target = e.target as HTMLElement;
-      // Don't trigger if clicking the actual button
+      // Don't trigger if clicking the actual button or config button
       if (!target.closest('button')) {
         handleVoiceStart();
       }
@@ -163,6 +165,20 @@ function App() {
       className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 text-white overflow-hidden cursor-pointer"
       onClick={handleScreenTap}
     >
+      {/* Configuration Button */}
+      <div className="fixed top-6 right-6 z-20">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowApiConfig(true);
+          }}
+          className="p-3 bg-black/20 backdrop-blur-sm border border-white/20 rounded-2xl hover:bg-black/30 transition-all duration-200 group"
+          title="Configure ElevenLabs API"
+        >
+          <Settings className="w-6 h-6 text-gray-300 group-hover:text-white group-hover:rotate-90 transition-all duration-300" />
+        </button>
+      </div>
+
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -314,6 +330,12 @@ function App() {
         {/* Bottom Spacing */}
         <div className="h-8"></div>
       </div>
+
+      {/* API Configuration Modal */}
+      <ApiConfigModal 
+        isOpen={showApiConfig} 
+        onClose={() => setShowApiConfig(false)} 
+      />
     </div>
   );
 }

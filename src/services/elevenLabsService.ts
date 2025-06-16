@@ -18,11 +18,56 @@ export const defaultVoiceSettings: VoiceSettings = {
   use_speaker_boost: true
 };
 
+// Get API key from localStorage or fallback to default
+const getApiKey = (): string => {
+  try {
+    const config = localStorage.getItem('elevenlabs-config');
+    if (config) {
+      const parsed = JSON.parse(config);
+      return parsed.apiKey || ELEVENLABS_API_KEY;
+    }
+  } catch (error) {
+    console.error('Error reading API config:', error);
+  }
+  return ELEVENLABS_API_KEY;
+};
+
+// Get voice settings from localStorage or fallback to default
+const getVoiceSettings = (): VoiceSettings => {
+  try {
+    const config = localStorage.getItem('elevenlabs-config');
+    if (config) {
+      const parsed = JSON.parse(config);
+      return parsed.voiceSettings || defaultVoiceSettings;
+    }
+  } catch (error) {
+    console.error('Error reading voice settings:', error);
+  }
+  return defaultVoiceSettings;
+};
+
+// Get voice ID from localStorage or fallback to default
+const getVoiceId = (): string => {
+  try {
+    const config = localStorage.getItem('elevenlabs-config');
+    if (config) {
+      const parsed = JSON.parse(config);
+      return parsed.voiceId || DEFAULT_VOICE_ID;
+    }
+  } catch (error) {
+    console.error('Error reading voice ID:', error);
+  }
+  return DEFAULT_VOICE_ID;
+};
+
 export const testApiConnection = async (): Promise<boolean> => {
   try {
+    // Use temporary key if testing, otherwise use stored key
+    const apiKey = (window as any).TEMP_ELEVENLABS_KEY || getApiKey();
+    
     const response = await fetch(`${ELEVENLABS_API_URL}/user`, {
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY
+        'xi-api-key': apiKey
       }
     });
 
@@ -35,21 +80,25 @@ export const testApiConnection = async (): Promise<boolean> => {
 
 export const synthesizeSpeech = async (
   text: string,
-  voiceId: string = DEFAULT_VOICE_ID,
-  voiceSettings: VoiceSettings = defaultVoiceSettings
+  voiceId?: string,
+  voiceSettings?: VoiceSettings
 ): Promise<ArrayBuffer> => {
   try {
-    const response = await fetch(`${ELEVENLABS_API_URL}/text-to-speech/${voiceId}`, {
+    const apiKey = getApiKey();
+    const finalVoiceId = voiceId || getVoiceId();
+    const finalVoiceSettings = voiceSettings || getVoiceSettings();
+
+    const response = await fetch(`${ELEVENLABS_API_URL}/text-to-speech/${finalVoiceId}`, {
       method: 'POST',
       headers: {
         'Accept': 'audio/mpeg',
         'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY
+        'xi-api-key': apiKey
       },
       body: JSON.stringify({
         text,
         model_id: 'eleven_monolingual_v1',
-        voice_settings: voiceSettings
+        voice_settings: finalVoiceSettings
       })
     });
 
@@ -91,9 +140,11 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
 
 export const getAvailableVoices = async () => {
   try {
+    const apiKey = getApiKey();
+    
     const response = await fetch(`${ELEVENLABS_API_URL}/voices`, {
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY
+        'xi-api-key': apiKey
       }
     });
 
