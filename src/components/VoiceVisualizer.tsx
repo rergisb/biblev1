@@ -66,20 +66,20 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
           const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, baseRadius + waveAmplitude);
           
           if (isRecording) {
-            gradient.addColorStop(0, `rgba(16, 185, 129, ${0.4 - ringProgress * 0.3})`); // emerald-500
-            gradient.addColorStop(0.5, `rgba(5, 150, 105, ${0.3 - ringProgress * 0.2})`); // emerald-600
-            gradient.addColorStop(1, `rgba(4, 120, 87, ${0.1 - ringProgress * 0.1})`); // emerald-700
+            gradient.addColorStop(0, `rgba(147, 51, 234, ${0.4 - ringProgress * 0.3})`); // purple-600
+            gradient.addColorStop(0.5, `rgba(126, 34, 206, ${0.3 - ringProgress * 0.2})`); // purple-700
+            gradient.addColorStop(1, `rgba(107, 33, 168, ${0.1 - ringProgress * 0.1})`); // purple-800
           } else {
-            gradient.addColorStop(0, `rgba(20, 184, 166, ${0.4 - ringProgress * 0.3})`); // teal-500
-            gradient.addColorStop(0.5, `rgba(13, 148, 136, ${0.3 - ringProgress * 0.2})`); // teal-600
-            gradient.addColorStop(1, `rgba(15, 118, 110, ${0.1 - ringProgress * 0.1})`); // teal-700
+            gradient.addColorStop(0, `rgba(139, 92, 246, ${0.4 - ringProgress * 0.3})`); // violet-500
+            gradient.addColorStop(0.5, `rgba(124, 58, 237, ${0.3 - ringProgress * 0.2})`); // violet-600
+            gradient.addColorStop(1, `rgba(109, 40, 217, ${0.1 - ringProgress * 0.1})`); // violet-700
           }
           
           ctx.fillStyle = gradient;
           ctx.fill();
           
           // Add glow effect
-          ctx.shadowColor = isRecording ? '#10B981' : '#14B8A6';
+          ctx.shadowColor = isRecording ? '#9333EA' : '#8B5CF6';
           ctx.shadowBlur = 15 - (ringProgress * 10);
           ctx.fill();
           ctx.shadowBlur = 0;
@@ -90,11 +90,11 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
         const pulseGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, pulseRadius);
         
         if (isRecording) {
-          pulseGradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
-          pulseGradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+          pulseGradient.addColorStop(0, 'rgba(147, 51, 234, 0.8)');
+          pulseGradient.addColorStop(1, 'rgba(147, 51, 234, 0)');
         } else {
-          pulseGradient.addColorStop(0, 'rgba(20, 184, 166, 0.8)');
-          pulseGradient.addColorStop(1, 'rgba(20, 184, 166, 0)');
+          pulseGradient.addColorStop(0, 'rgba(139, 92, 246, 0.8)');
+          pulseGradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
         }
         
         ctx.beginPath();
@@ -117,9 +117,9 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
           const radius = baseRadius * breathe;
           
           const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-          gradient.addColorStop(0, `rgba(20, 184, 166, ${opacity * 0.5})`);
-          gradient.addColorStop(0.7, `rgba(13, 148, 136, ${opacity * 0.3})`);
-          gradient.addColorStop(1, `rgba(15, 118, 110, 0)`);
+          gradient.addColorStop(0, `rgba(139, 92, 246, ${opacity * 0.5})`);
+          gradient.addColorStop(0.7, `rgba(124, 58, 237, ${opacity * 0.3})`);
+          gradient.addColorStop(1, `rgba(109, 40, 217, 0)`);
           
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -129,8 +129,8 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
         
         // Subtle center dot
         const dotGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 8);
-        dotGradient.addColorStop(0, 'rgba(20, 184, 166, 0.3)');
-        dotGradient.addColorStop(1, 'rgba(20, 184, 166, 0)');
+        dotGradient.addColorStop(0, 'rgba(139, 92, 246, 0.3)');
+        dotGradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
         
         ctx.beginPath();
         ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
@@ -162,10 +162,10 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
       {/* Additional glow overlay */}
       <div className={`absolute inset-0 rounded-full transition-all duration-500 ${
         isRecording 
-          ? 'bg-emerald-500/5 shadow-2xl shadow-emerald-500/20' 
+          ? 'bg-purple-500/5 shadow-2xl shadow-purple-500/20' 
           : isPlaying
-          ? 'bg-teal-500/5 shadow-2xl shadow-teal-500/20'
-          : 'bg-teal-500/2'
+          ? 'bg-violet-500/5 shadow-2xl shadow-violet-500/20'
+          : 'bg-violet-500/2'
       }`}></div>
     </div>
   );

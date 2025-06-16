@@ -58,7 +58,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-2xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-2xl flex items-center justify-center">
               <History className="w-6 h-6 text-white" />
             </div>
             <div>

@@ -257,9 +257,9 @@ function App() {
 
   if (!browserSupportsSpeechRecognition) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 flex items-center justify-center p-6">
-        <div className="bg-black/30 backdrop-blur-xl p-8 rounded-3xl border border-emerald-500/20 shadow-2xl text-center max-w-md">
-          <div className="w-16 h-16 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center p-6">
+        <div className="bg-black/30 backdrop-blur-xl p-8 rounded-3xl border border-purple-500/20 shadow-2xl text-center max-w-md">
+          <div className="w-16 h-16 bg-gradient-to-r from-purple-400 to-violet-400 rounded-full flex items-center justify-center mx-auto mb-6">
             <MicOff className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-4">Browser Not Supported</h1>
@@ -276,7 +276,7 @@ function App() {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-900 to-teal-900 text-white overflow-hidden cursor-pointer"
+      className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white overflow-hidden cursor-pointer"
       onClick={handleScreenTap}
     >
       {/* Configuration Button */}
@@ -295,9 +295,9 @@ function App() {
 
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-400/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
       </div>
 
       {/* Main Content Container */}
@@ -317,23 +317,23 @@ function App() {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
                 isRecording 
-                  ? 'bg-emerald-500/20 shadow-lg shadow-emerald-500/30' 
+                  ? 'bg-purple-500/20 shadow-lg shadow-purple-500/30' 
                   : isPlayingAudio || isPlayingGreeting
-                  ? 'bg-teal-500/20 shadow-lg shadow-teal-500/30'
+                  ? 'bg-violet-500/20 shadow-lg shadow-violet-500/30'
                   : 'bg-gray-500/10'
               }`}>
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isRecording 
-                    ? 'bg-emerald-500/30 animate-pulse' 
+                    ? 'bg-purple-500/30 animate-pulse' 
                     : isPlayingAudio || isPlayingGreeting
-                    ? 'bg-teal-500/30 animate-pulse'
+                    ? 'bg-violet-500/30 animate-pulse'
                     : 'bg-gray-500/20'
                 }`}>
                   <Mic className={`w-8 h-8 transition-colors duration-300 ${
                     isRecording 
-                      ? 'text-emerald-300' 
+                      ? 'text-purple-300' 
                       : isPlayingAudio || isPlayingGreeting
-                      ? 'text-teal-300'
+                      ? 'text-violet-300'
                       : 'text-gray-400'
                   }`} />
                 </div>
@@ -353,9 +353,9 @@ function App() {
 
           {/* AI Response Display */}
           {lastResponse && !isProcessing && !isPlayingAudio && (
-            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-teal-500/20">
+            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-violet-500/20">
               <p className="text-gray-300 text-center mb-2">
-                <span className="text-teal-400 font-medium">Bible Companion:</span>
+                <span className="text-violet-400 font-medium">Bible Companion:</span>
               </p>
               <p className="text-white text-sm text-center leading-relaxed">"{lastResponse}"</p>
             </div>
@@ -365,38 +365,38 @@ function App() {
           <div className="text-center min-h-[60px] flex items-center justify-center">
             {isPlayingGreeting ? (
               <div className="flex items-center justify-center gap-3">
-                <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
-                <p className="text-teal-300 font-medium">Welcome to your Bible companion...</p>
+                <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
+                <p className="text-violet-300 font-medium">Welcome to your Bible companion...</p>
               </div>
             ) : isRecording ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                  <p className="text-emerald-300 font-medium">Listening...</p>
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                  <p className="text-purple-300 font-medium">Listening...</p>
                 </div>
                 <p className="text-gray-400 text-sm">Share your heart or ask for guidance</p>
                 {pendingTranscript && (
-                  <p className="text-emerald-200 text-xs italic">"{pendingTranscript}"</p>
+                  <p className="text-purple-200 text-xs italic">"{pendingTranscript}"</p>
                 )}
               </div>
             ) : isProcessing ? (
               <div className="flex items-center justify-center gap-3">
                 <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-teal-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-violet-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
-                <span className="text-teal-300 font-medium">Seeking wisdom...</span>
+                <span className="text-violet-300 font-medium">Seeking wisdom...</span>
               </div>
             ) : isPlayingAudio ? (
               <div className="flex items-center justify-center gap-3">
-                <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
-                <span className="text-teal-300 font-medium">🔊 Speaking God's word...</span>
+                <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
+                <span className="text-violet-300 font-medium">🔊 Speaking God's word...</span>
               </div>
             ) : currentTranscript ? (
-              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-emerald-500/20">
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/20">
                 <p className="text-gray-300 text-center">
-                  <span className="text-emerald-400 font-medium">You said:</span>
+                  <span className="text-purple-400 font-medium">You said:</span>
                 </p>
                 <p className="text-white mt-1 text-center">"{currentTranscript}"</p>
                 {confidence && (
@@ -425,7 +425,7 @@ function App() {
             className={`relative w-20 h-20 rounded-full transition-all duration-300 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
               isRecording
                 ? 'bg-gradient-to-r from-red-500 to-red-600 shadow-lg shadow-red-500/30 hover:shadow-red-500/40'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/40 hover:scale-105'
+                : 'bg-gradient-to-r from-purple-500 to-violet-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/40 hover:scale-105'
             }`}
             aria-label={isRecording ? 'Stop recording' : 'Start recording'}
           >
@@ -433,7 +433,7 @@ function App() {
             <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
               isRecording
                 ? 'bg-red-500/20 animate-ping'
-                : 'bg-emerald-500/20'
+                : 'bg-purple-500/20'
             }`}></div>
             
             {/* Button Content */}
@@ -451,7 +451,7 @@ function App() {
             <div className={`absolute inset-0 rounded-full animate-ping ${
               isRecording 
                 ? 'bg-red-500/30' 
-                : 'bg-teal-500/30'
+                : 'bg-violet-500/30'
             }`}></div>
           )}
         </div>

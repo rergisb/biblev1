@@ -123,7 +123,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-2xl flex items-center justify-center">
               <Settings className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -143,7 +143,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
           {/* API Key Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Key className="w-5 h-5 text-emerald-400" />
+              <Key className="w-5 h-5 text-purple-400" />
               <h3 className="text-lg font-semibold text-white">API Configuration</h3>
             </div>
             
@@ -157,7 +157,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                     type={showApiKey ? 'text' : 'password'}
                     value={tempConfig.apiKey}
                     onChange={(e) => setTempConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                    className="w-full p-3 pr-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full p-3 pr-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="sk_..."
                   />
                   <button
@@ -174,7 +174,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                     href="https://elevenlabs.io/app/speech-synthesis" 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-emerald-400 hover:text-emerald-300 underline"
+                    className="text-purple-400 hover:text-purple-300 underline"
                   >
                     ElevenLabs Dashboard
                   </a>
@@ -185,7 +185,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                 <button
                   onClick={handleTestConnection}
                   disabled={isTestingConnection || !tempConfig.apiKey.trim()}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-300 rounded-xl hover:bg-emerald-500/30 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-300 rounded-xl hover:bg-purple-500/30 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <TestTube className="w-4 h-4" />
                   {isTestingConnection ? 'Testing...' : 'Test Connection'}
@@ -218,7 +218,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                   isPlayingTest 
                     ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' 
-                    : 'bg-teal-500/20 text-teal-300 hover:bg-teal-500/30'
+                    : 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
                 }`}
               >
                 {isPlayingTest ? (
@@ -242,7 +242,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
               <select
                 value={tempConfig.voiceId}
                 onChange={(e) => setTempConfig(prev => ({ ...prev, voiceId: e.target.value }))}
-                className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 {voiceOptions.map((voice) => (
                   <option key={voice.id} value={voice.id} className="bg-gray-800">
@@ -275,7 +275,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                     ...prev,
                     voiceSettings: { ...prev.voiceSettings, stability: parseFloat(e.target.value) }
                   }))}
-                  className="w-full accent-emerald-500"
+                  className="w-full accent-purple-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Higher values make voice more consistent</p>
               </div>
@@ -294,7 +294,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                     ...prev,
                     voiceSettings: { ...prev.voiceSettings, similarity_boost: parseFloat(e.target.value) }
                   }))}
-                  className="w-full accent-emerald-500"
+                  className="w-full accent-purple-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Higher values make voice more similar to original</p>
               </div>
@@ -313,7 +313,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                     ...prev,
                     voiceSettings: { ...prev.voiceSettings, style: parseFloat(e.target.value) }
                   }))}
-                  className="w-full accent-emerald-500"
+                  className="w-full accent-purple-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Higher values add more expressiveness</p>
               </div>
@@ -326,7 +326,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
                     voiceSettings: { ...prev.voiceSettings, use_speaker_boost: !prev.voiceSettings.use_speaker_boost }
                   }))}
                   className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                    tempConfig.voiceSettings.use_speaker_boost ? 'bg-emerald-500' : 'bg-gray-600'
+                    tempConfig.voiceSettings.use_speaker_boost ? 'bg-purple-500' : 'bg-gray-600'
                   }`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
@@ -336,8 +336,8 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
               </div>
             </div>
             
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
-              <p className="text-sm text-emerald-300 mb-2">💡 Voice Testing Tip</p>
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+              <p className="text-sm text-purple-300 mb-2">💡 Voice Testing Tip</p>
               <p className="text-xs text-gray-400">
                 Adjust the settings above and click "Test Voice" to hear how they affect the voice quality. 
                 The test will use a sample Bible-themed message to help you find the perfect voice for your spiritual companion.
@@ -356,7 +356,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all duration-200"
+            className="px-6 py-2 bg-gradient-to-r from-purple-500 to-violet-500 text-white rounded-xl hover:from-purple-600 hover:to-violet-600 transition-all duration-200"
           >
             Save Configuration
           </button>

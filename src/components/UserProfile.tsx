@@ -22,7 +22,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
     avatar: '👤',
     voiceSpeed: 1.0,
     autoPlay: true,
-    theme: 'dark',
+    theme: 'purple',
     hapticFeedback: true
   });
 
@@ -43,7 +43,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-2xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-2xl flex items-center justify-center">
               <User className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -68,7 +68,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                 type="text"
                 value={tempSettings.name}
                 onChange={(e) => setTempSettings(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-[#0067D2] focus:border-transparent"
+                className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="Enter your name"
               />
             </div>
@@ -82,7 +82,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                     onClick={() => setTempSettings(prev => ({ ...prev, avatar }))}
                     className={`p-3 rounded-xl text-2xl transition-all duration-200 ${
                       tempSettings.avatar === avatar
-                        ? 'bg-[#0067D2]/30 border-2 border-[#0067D2]'
+                        ? 'bg-purple-500/30 border-2 border-purple-500'
                         : 'bg-white/10 border border-white/20 hover:bg-white/20'
                     }`}
                   >
@@ -111,7 +111,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                 step="0.1"
                 value={tempSettings.voiceSpeed}
                 onChange={(e) => setTempSettings(prev => ({ ...prev, voiceSpeed: parseFloat(e.target.value) }))}
-                className="w-full accent-[#0067D2]"
+                className="w-full accent-purple-500"
               />
             </div>
 
@@ -120,7 +120,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
               <button
                 onClick={() => setTempSettings(prev => ({ ...prev, autoPlay: !prev.autoPlay }))}
                 className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                  tempSettings.autoPlay ? 'bg-[#0067D2]' : 'bg-gray-600'
+                  tempSettings.autoPlay ? 'bg-purple-500' : 'bg-gray-600'
                 }`}
               >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
@@ -142,7 +142,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
               <button
                 onClick={() => setTempSettings(prev => ({ ...prev, hapticFeedback: !prev.hapticFeedback }))}
                 className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                  tempSettings.hapticFeedback ? 'bg-[#0067D2]' : 'bg-gray-600'
+                  tempSettings.hapticFeedback ? 'bg-purple-500' : 'bg-gray-600'
                 }`}
               >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
@@ -163,7 +163,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-gradient-to-r from-[#0067D2] to-purple-500 text-white rounded-xl hover:from-[#0052A3] hover:to-purple-600 transition-all duration-200"
+            className="px-6 py-2 bg-gradient-to-r from-purple-500 to-violet-500 text-white rounded-xl hover:from-purple-600 hover:to-violet-600 transition-all duration-200"
           >
             Save Changes
           </button>

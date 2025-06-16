@@ -22,12 +22,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     <div className={`flex gap-4 p-6 rounded-3xl backdrop-blur-sm border transition-all duration-500 hover:scale-[1.02] ${
       isUser 
         ? 'bg-white/5 border-white/10 ml-16' 
-        : 'bg-gradient-to-r from-[#0067D2]/10 to-purple-500/10 border-[#0067D2]/20 mr-16'
+        : 'bg-gradient-to-r from-purple-500/10 to-violet-500/10 border-purple-500/20 mr-16'
     }`}>
       <div className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
         isUser 
           ? 'bg-gradient-to-r from-gray-600 to-gray-700 shadow-gray-600/30' 
-          : 'bg-gradient-to-r from-[#0067D2] to-purple-500 shadow-[#0067D2]/30'
+          : 'bg-gradient-to-r from-purple-500 to-violet-500 shadow-purple-500/30'
       }`}>
         {isUser ? (
           <User className="w-6 h-6 text-white" />
@@ -39,7 +39,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-sm font-semibold text-white">
-            {isUser ? 'You' : 'Neural Assistant'}
+            {isUser ? 'You' : 'Bible Companion'}
           </span>
           <span className="text-xs text-gray-500">
             {timestamp.toLocaleTimeString()}
@@ -56,7 +56,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               disabled={isPlaying}
               className={`p-2 rounded-xl transition-all duration-300 hover:scale-110 ${
                 isPlaying 
-                  ? 'bg-[#0067D2]/30 text-[#0067D2] animate-pulse' 
+                  ? 'bg-purple-500/30 text-purple-400 animate-pulse' 
                   : 'hover:bg-white/10 text-gray-400 hover:text-white'
               }`}
               title="Play audio"
