@@ -60,10 +60,9 @@ const getVoiceId = (): string => {
   return DEFAULT_VOICE_ID;
 };
 
-export const testApiConnection = async (): Promise<boolean> => {
+export const testApiConnection = async (testApiKey?: string): Promise<boolean> => {
   try {
-    // Use temporary key if testing, otherwise use stored key
-    const apiKey = (window as any).TEMP_ELEVENLABS_KEY || getApiKey();
+    const apiKey = testApiKey || getApiKey();
     
     const response = await fetch(`${ELEVENLABS_API_URL}/user`, {
       headers: {
@@ -81,10 +80,11 @@ export const testApiConnection = async (): Promise<boolean> => {
 export const synthesizeSpeech = async (
   text: string,
   voiceId?: string,
-  voiceSettings?: VoiceSettings
+  voiceSettings?: VoiceSettings,
+  testApiKey?: string
 ): Promise<ArrayBuffer> => {
   try {
-    const apiKey = getApiKey();
+    const apiKey = testApiKey || getApiKey();
     const finalVoiceId = voiceId || getVoiceId();
     const finalVoiceSettings = voiceSettings || getVoiceSettings();
 
@@ -131,16 +131,16 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
         reject(error);
       };
       
-      audio.play();
+      audio.play().catch(reject);
     } catch (error) {
       reject(error);
     }
   });
 };
 
-export const getAvailableVoices = async () => {
+export const getAvailableVoices = async (testApiKey?: string) => {
   try {
-    const apiKey = getApiKey();
+    const apiKey = testApiKey || getApiKey();
     
     const response = await fetch(`${ELEVENLABS_API_URL}/voices`, {
       headers: {

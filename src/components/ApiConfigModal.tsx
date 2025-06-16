@@ -55,15 +55,8 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
     setConnectionStatus('idle');
 
     try {
-      // Temporarily update the service with test API key
-      const originalKey = process.env.ELEVENLABS_API_KEY;
-      (window as any).TEMP_ELEVENLABS_KEY = tempConfig.apiKey;
-      
-      const isConnected = await testApiConnection();
+      const isConnected = await testApiConnection(tempConfig.apiKey);
       setConnectionStatus(isConnected ? 'success' : 'error');
-      
-      // Restore original key
-      delete (window as any).TEMP_ELEVENLABS_KEY;
     } catch (error) {
       console.error('Connection test failed:', error);
       setConnectionStatus('error');
@@ -82,24 +75,26 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({ isOpen, onClose 
     setIsPlayingTest(true);
 
     try {
-      // Temporarily update the service with test configuration
-      (window as any).TEMP_ELEVENLABS_KEY = tempConfig.apiKey;
-      
       const testText = "Hello! This is a test of your Bible companion voice. May God's peace be with you today.";
+      
+      console.log('Testing voice with:', {
+        voiceId: tempConfig.voiceId,
+        settings: tempConfig.voiceSettings,
+        apiKey: tempConfig.apiKey.substring(0, 10) + '...'
+      });
       
       const audioBuffer = await synthesizeSpeech(
         testText,
         tempConfig.voiceId,
-        tempConfig.voiceSettings
+        tempConfig.voiceSettings,
+        tempConfig.apiKey
       );
       
       await playAudioBuffer(audioBuffer);
       
-      // Clean up
-      delete (window as any).TEMP_ELEVENLABS_KEY;
     } catch (error) {
       console.error('Voice test failed:', error);
-      alert('Voice test failed. Please check your API key and settings.');
+      alert(`Voice test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsTestingVoice(false);
       setIsPlayingTest(false);
