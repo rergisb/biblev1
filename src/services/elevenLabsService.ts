@@ -114,6 +114,7 @@ export const synthesizeSpeech = async (
   }
 };
 
+// Enhanced audio playback with mobile compatibility
 export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
@@ -121,18 +122,88 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
       
+      // Enhanced mobile compatibility settings
+      audio.preload = 'auto';
+      audio.crossOrigin = 'anonymous';
+      
+      // iOS Safari specific settings
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        // iOS requires user interaction for audio playback
+        audio.muted = false;
+        audio.volume = 1.0;
+      }
+      
+      let hasEnded = false;
+      
+      const cleanup = () => {
+        if (!hasEnded) {
+          hasEnded = true;
+          URL.revokeObjectURL(audioUrl);
+        }
+      };
+      
       audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
+        cleanup();
         resolve();
       };
       
       audio.onerror = (error) => {
-        URL.revokeObjectURL(audioUrl);
-        reject(error);
+        console.error('Audio playback error:', error);
+        cleanup();
+        reject(new Error('Audio playback failed'));
       };
       
-      audio.play().catch(reject);
+      audio.oncanplaythrough = () => {
+        console.log('Audio can play through');
+      };
+      
+      audio.onloadstart = () => {
+        console.log('Audio load started');
+      };
+      
+      audio.onloadeddata = () => {
+        console.log('Audio data loaded');
+      };
+      
+      // Enhanced play with error handling for mobile
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('Audio playback started successfully');
+          })
+          .catch((error) => {
+            console.error('Audio play promise rejected:', error);
+            
+            // Handle specific mobile errors
+            if (error.name === 'NotAllowedError') {
+              console.error('Audio playback not allowed - user interaction required');
+              cleanup();
+              reject(new Error('Audio playback requires user interaction on this device'));
+            } else if (error.name === 'NotSupportedError') {
+              console.error('Audio format not supported');
+              cleanup();
+              reject(new Error('Audio format not supported on this device'));
+            } else {
+              cleanup();
+              reject(error);
+            }
+          });
+      }
+      
+      // Fallback timeout for mobile devices
+      setTimeout(() => {
+        if (!hasEnded && audio.paused) {
+          console.warn('Audio playback timeout - forcing cleanup');
+          cleanup();
+          reject(new Error('Audio playback timeout'));
+        }
+      }, 30000); // 30 second timeout
+      
     } catch (error) {
+      console.error('Error creating audio:', error);
       reject(error);
     }
   });

@@ -26,6 +26,7 @@ function App() {
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [lastResponse, setLastResponse] = useState<string>('');
   const [pendingTranscript, setPendingTranscript] = useState<string>('');
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
 
   // Add ref to track if we're currently processing to prevent duplicates
   const processingRef = useRef(false);
@@ -46,14 +47,14 @@ function App() {
     setIsRecording(isListening);
   }, [isListening]);
 
-  // Play welcome greeting
+  // Play welcome greeting only after user interaction (required for mobile)
   useEffect(() => {
     const playWelcomeGreeting = async () => {
-      if (hasPlayedGreeting || !browserSupportsSpeechRecognition) return;
+      if (hasPlayedGreeting || !browserSupportsSpeechRecognition || !userHasInteracted) return;
       
       try {
         setIsPlayingGreeting(true);
-        const greetingText = "Hello there! Want to read a verse or get some Bible advice? Tap anywhere to start.";
+        const greetingText = "Hello there! Want to read a verse or get some Bible advice? Tap the button to start.";
         const audioBuffer = await synthesizeSpeech(greetingText);
         await playAudioBuffer(audioBuffer);
         setHasPlayedGreeting(true);
@@ -66,9 +67,11 @@ function App() {
       }
     };
 
-    const timer = setTimeout(playWelcomeGreeting, 1500);
-    return () => clearTimeout(timer);
-  }, [hasPlayedGreeting, browserSupportsSpeechRecognition]);
+    if (userHasInteracted) {
+      const timer = setTimeout(playWelcomeGreeting, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [hasPlayedGreeting, browserSupportsSpeechRecognition, userHasInteracted]);
 
   // Handle transcript changes - process immediately when we have a final transcript
   useEffect(() => {
@@ -152,37 +155,21 @@ function App() {
       
       setIsPlayingAudio(true);
       
-      // Use a promise-based approach to ensure single playback
-      await new Promise<void>((resolve, reject) => {
-        try {
-          const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-          const audioUrl = URL.createObjectURL(blob);
-          const audio = new Audio(audioUrl);
-          
-          // Store reference to current audio
-          audioRef.current = audio;
-          
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
-            setIsPlayingAudio(false);
-            resolve();
-          };
-          
-          audio.onerror = (error) => {
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
-            setIsPlayingAudio(false);
-            reject(error);
-          };
-          
-          // Ensure only one audio plays
-          audio.play().catch(reject);
-        } catch (error) {
-          setIsPlayingAudio(false);
-          reject(error);
+      // Use enhanced playback with better mobile support
+      try {
+        await playAudioBuffer(audioBuffer);
+        setIsPlayingAudio(false);
+      } catch (audioError) {
+        console.error('Audio playback failed:', audioError);
+        setIsPlayingAudio(false);
+        
+        // Show user-friendly error for audio issues
+        if (audioError instanceof Error && audioError.message.includes('user interaction')) {
+          setError('Please tap the screen first to enable audio on your device.');
+        } else {
+          setError('Audio playback failed. Please check your device settings.');
         }
-      });
+      }
       
     } catch (error) {
       console.error('Error processing message:', error);
@@ -206,6 +193,11 @@ function App() {
   };
 
   const handleVoiceStart = () => {
+    // Mark user interaction for mobile audio
+    if (!userHasInteracted) {
+      setUserHasInteracted(true);
+    }
+    
     setError(null);
     setCurrentTranscript('');
     setLastResponse('');
@@ -238,6 +230,11 @@ function App() {
 
   // Handle tap anywhere to start conversation
   const handleScreenTap = (e: React.MouseEvent) => {
+    // Mark user interaction for mobile audio
+    if (!userHasInteracted) {
+      setUserHasInteracted(true);
+    }
+    
     // Only trigger if not already recording/processing and not clicking the button
     if (!isRecording && !isProcessing && !isPlayingAudio && !isPlayingGreeting) {
       const target = e.target as HTMLElement;
@@ -266,8 +263,11 @@ function App() {
             <MicOff className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-4">Browser Not Supported</h1>
-          <p className="text-gray-300 leading-relaxed">
+          <p className="text-gray-300 leading-relaxed mb-4">
             Your browser doesn't support speech recognition. Please use Chrome, Safari, or another modern browser to experience the voice assistant.
+          </p>
+          <p className="text-sm text-gray-400">
+            On iOS, make sure you're using Safari and have microphone permissions enabled.
           </p>
         </div>
       </div>
@@ -409,7 +409,9 @@ function App() {
               <div className="text-center">
                 <p className="text-gray-300 font-medium mb-2">Ready for Bible guidance</p>
                 <p className="text-gray-400 text-sm mb-1">Ask for a verse or spiritual advice</p>
-                <p className="text-gray-500 text-xs">Tap anywhere to start speaking</p>
+                <p className="text-gray-500 text-xs">
+                  {userHasInteracted ? 'Tap the button below to speak' : 'Tap anywhere to start'}
+                </p>
               </div>
             )}
           </div>
