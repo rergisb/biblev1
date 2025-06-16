@@ -226,50 +226,8 @@ function App() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#0067D2]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
       </div>
 
-      {/* Header */}
-      <header className="relative z-10 bg-black/20 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-[#0067D2] to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-[#0067D2]/30">
-                <MessageCircle className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                  Neural Assistant
-                </h1>
-                <p className="text-sm text-gray-400">AI-Powered Voice Interface</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowHistory(true)}
-                className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105 group"
-                title="Chat History"
-              >
-                <History className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
-              </button>
-              <button
-                onClick={() => setShowProfile(true)}
-                className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105 group"
-                title="User Profile"
-              >
-                <User className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
-              </button>
-              <button
-                onClick={startNewSession}
-                className="px-4 py-2 rounded-2xl bg-gradient-to-r from-[#0067D2] to-purple-500 hover:from-[#0052A3] hover:to-purple-600 transition-all duration-300 hover:scale-105 shadow-lg shadow-[#0067D2]/30"
-              >
-                <span className="text-sm font-medium">New Chat</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-[calc(100vh-88px)]">
+      <main className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex flex-col h-screen">
         {/* Welcome Screen */}
         <div className="flex-1 flex items-center justify-center mb-6">
           <div className="text-center py-16">
