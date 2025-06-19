@@ -160,6 +160,15 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
         reject(new Error('Audio playback failed'));
       };
       
+      // Handle manual stop
+      audio.onpause = () => {
+        if (!hasEnded && audio.currentTime >= 0) {
+          console.log('Audio manually paused');
+          cleanup();
+          resolve();
+        }
+      };
+      
       audio.oncanplaythrough = () => {
         console.log('Audio can play through');
       };
@@ -170,14 +179,6 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       
       audio.onloadeddata = () => {
         console.log('Audio data loaded');
-      };
-      
-      // Handle manual stop
-      audio.onpause = () => {
-        if (!hasEnded && audio.currentTime > 0) {
-          cleanup();
-          resolve();
-        }
       };
       
       // Enhanced play with error handling for mobile
@@ -209,7 +210,7 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       
       // Fallback timeout for mobile devices
       setTimeout(() => {
-        if (!hasEnded && audio.paused) {
+        if (!hasEnded && audio.paused && audio.currentTime === 0) {
           console.warn('Audio playback timeout - forcing cleanup');
           cleanup();
           reject(new Error('Audio playback timeout'));
@@ -227,6 +228,7 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
 export const stopCurrentAudio = (): void => {
   const currentAudio = (window as any).currentAudio;
   if (currentAudio && !currentAudio.paused) {
+    console.log('Stopping current audio playback');
     currentAudio.pause();
     currentAudio.currentTime = 0;
     (window as any).currentAudio = null;

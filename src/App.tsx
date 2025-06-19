@@ -3,7 +3,7 @@ import { Mic, MicOff, Settings, Square } from 'lucide-react';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ApiConfigModal } from './components/ApiConfigModal';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
-import { synthesizeSpeech, playAudioBuffer } from './services/elevenLabsService';
+import { synthesizeSpeech, playAudioBuffer, stopCurrentAudio } from './services/elevenLabsService';
 import { generateGeminiResponse } from './services/geminiService';
 
 interface Message {
@@ -56,6 +56,13 @@ function App() {
         setIsPlayingGreeting(true);
         const greetingText = "Hello there! Want to read a verse or get some Bible advice? Tap the button to start.";
         const audioBuffer = await synthesizeSpeech(greetingText);
+        
+        // Store audio reference for stopping
+        const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        
         await playAudioBuffer(audioBuffer);
         setHasPlayedGreeting(true);
       } catch (error) {
@@ -64,6 +71,7 @@ function App() {
         setHasPlayedGreeting(true);
       } finally {
         setIsPlayingGreeting(false);
+        audioRef.current = null;
       }
     };
 
@@ -152,13 +160,21 @@ function App() {
       
       setIsPlayingAudio(true);
       
+      // Create and store audio reference for stopping
+      const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
       // Use enhanced playback with better mobile support
       try {
         await playAudioBuffer(audioBuffer);
         setIsPlayingAudio(false);
+        audioRef.current = null;
       } catch (audioError) {
         console.error('Audio playback failed:', audioError);
         setIsPlayingAudio(false);
+        audioRef.current = null;
         
         // Show user-friendly error for audio issues
         if (audioError instanceof Error && audioError.message.includes('user interaction')) {
@@ -190,11 +206,16 @@ function App() {
   };
 
   const stopAudio = () => {
+    // Stop the global audio reference
+    stopCurrentAudio();
+    
+    // Stop local audio reference
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       audioRef.current = null;
     }
+    
     setIsPlayingAudio(false);
     setIsPlayingGreeting(false);
   };
@@ -254,6 +275,13 @@ function App() {
     }
   };
 
+  const handleVisualizerClick = () => {
+    // Only handle clicks when audio is playing
+    if (isPlayingAudio || isPlayingGreeting) {
+      handleStopAudio();
+    }
+  };
+
   // Handle tap anywhere to start conversation
   const handleScreenTap = (e: React.MouseEvent) => {
     // Mark user interaction for mobile audio
@@ -261,11 +289,11 @@ function App() {
       setUserHasInteracted(true);
     }
     
-    // Only trigger if not already recording/processing and not clicking the button
+    // Only trigger if not already recording/processing and not clicking the button or visualizer
     if (!isRecording && !isProcessing && !isPlayingAudio && !isPlayingGreeting) {
       const target = e.target as HTMLElement;
-      // Don't trigger if clicking the actual button or config button
-      if (!target.closest('button')) {
+      // Don't trigger if clicking the actual button, config button, or visualizer
+      if (!target.closest('button') && !target.closest('.voice-visualizer')) {
         handleVoiceStart();
       }
     }
@@ -328,7 +356,12 @@ function App() {
         
         {/* Central Visualizer Area */}
         <div className="flex-1 flex items-center justify-center w-full max-w-md">
-          <div className="relative">
+          <div 
+            className={`relative voice-visualizer ${
+              (isPlayingAudio || isPlayingGreeting) ? 'cursor-pointer' : ''
+            }`}
+            onClick={handleVisualizerClick}
+          >
             {/* Main Visualizer */}
             <VoiceVisualizer
               isRecording={isRecording}
@@ -337,7 +370,7 @@ function App() {
             />
             
             {/* Central Status Indicator */}
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
                 isRecording 
                   ? 'bg-purple-500/20 shadow-lg shadow-purple-500/30' 
@@ -353,7 +386,7 @@ function App() {
                     : 'bg-gray-500/20'
                 }`}>
                   {isPlayingAudio || isPlayingGreeting ? (
-                    <Square className={`w-6 h-6 text-violet-300 fill-current`} />
+                    <Square className={`w-6 h-6 text-violet-300 fill-current pointer-events-auto cursor-pointer`} />
                   ) : (
                     <Mic className={`w-8 h-8 transition-colors duration-300 ${
                       isRecording 
@@ -364,6 +397,13 @@ function App() {
                 </div>
               </div>
             </div>
+            
+            {/* Click hint overlay for audio playing state */}
+            {(isPlayingAudio || isPlayingGreeting) && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 rounded-full bg-red-500/10 animate-pulse"></div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -389,10 +429,12 @@ function App() {
           {/* Status Messages */}
           <div className="text-center min-h-[60px] flex items-center justify-center">
             {isPlayingGreeting ? (
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
-                <p className="text-violet-300 font-medium">Welcome to your Bible companion...</p>
-                <p className="text-gray-400 text-xs">Tap to stop</p>
+              <div className="space-y-1">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
+                  <p className="text-violet-300 font-medium">Welcome to your Bible companion...</p>
+                </div>
+                <p className="text-gray-400 text-xs">Tap the center or button to stop</p>
               </div>
             ) : isRecording ? (
               <div className="space-y-2">
@@ -415,12 +457,12 @@ function App() {
                 <span className="text-violet-300 font-medium">Seeking wisdom...</span>
               </div>
             ) : isPlayingAudio ? (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div className="flex items-center justify-center gap-3">
                   <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
                   <span className="text-violet-300 font-medium">🔊 Speaking God's word...</span>
                 </div>
-                <p className="text-gray-400 text-xs">Tap the button to stop and speak</p>
+                <p className="text-gray-400 text-xs">Tap the center or button to stop and speak</p>
               </div>
             ) : currentTranscript ? (
               <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/20">
