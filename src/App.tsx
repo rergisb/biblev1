@@ -54,6 +54,9 @@ function App() {
     confidence
   } = useSpeechRecognition();
 
+  // Detect iOS for special handling
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
   // Sync recording state with speech recognition
   useEffect(() => {
     setIsRecording(isListening);
@@ -124,31 +127,37 @@ function App() {
     }
   }, [hasPlayedGreeting, browserSupportsSpeechRecognition, userHasInteracted]);
 
-  // Handle transcript changes - process immediately when we have a final transcript
+  // Handle transcript changes - iOS specific handling
   useEffect(() => {
     if (transcript && transcript.trim()) {
       console.log('Transcript received:', transcript, 'isListening:', isListening);
       
-      // If we're not listening anymore, process the transcript immediately
-      if (!isListening) {
+      if (isIOS) {
+        // On iOS, we get final results immediately, so process them
+        console.log('iOS: Processing transcript immediately');
         handleUserMessage(transcript, confidence);
         resetTranscript();
       } else {
-        // Store the transcript while still listening
-        setPendingTranscript(transcript);
+        // Non-iOS: wait for listening to stop
+        if (!isListening) {
+          handleUserMessage(transcript, confidence);
+          resetTranscript();
+        } else {
+          setPendingTranscript(transcript);
+        }
       }
     }
-  }, [transcript, isListening, confidence]);
+  }, [transcript, isListening, confidence, isIOS]);
 
-  // Handle when listening stops - process any pending transcript
+  // Handle when listening stops - process any pending transcript (non-iOS)
   useEffect(() => {
-    if (!isListening && pendingTranscript && pendingTranscript.trim()) {
+    if (!isIOS && !isListening && pendingTranscript && pendingTranscript.trim()) {
       console.log('Processing pending transcript:', pendingTranscript);
       handleUserMessage(pendingTranscript, confidence);
       setPendingTranscript('');
       resetTranscript();
     }
-  }, [isListening, pendingTranscript, confidence]);
+  }, [isListening, pendingTranscript, confidence, isIOS]);
 
   const addMessage = (text: string, isUser: boolean, confidence?: number) => {
     const newMessage: Message = {
@@ -267,7 +276,7 @@ function App() {
     setIsPlayingGreeting(false);
   };
 
-  const handleVoiceStart = () => {
+  const handleVoiceStart = async () => {
     // Mark user interaction for mobile audio
     if (!userHasInteracted) {
       setUserHasInteracted(true);
@@ -284,7 +293,18 @@ function App() {
       navigator.vibrate(50);
     }
     
-    startListening();
+    try {
+      await startListening();
+    } catch (error) {
+      console.error('Error starting voice recognition:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('permission')) {
+          setError('Microphone permission is required. Please allow microphone access and try again.');
+        } else {
+          setError('Unable to start voice recognition. Please check your microphone settings.');
+        }
+      }
+    }
   };
 
   const handleVoiceStop = () => {
@@ -518,7 +538,9 @@ function App() {
                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
                   <p className="text-purple-300 font-medium">Listening...</p>
                 </div>
-                <p className="text-gray-400 text-sm">Share your heart or ask for guidance</p>
+                <p className="text-gray-400 text-sm">
+                  {isIOS ? 'Speak clearly and wait for processing' : 'Share your heart or ask for guidance'}
+                </p>
                 {pendingTranscript && (
                   <p className="text-purple-200 text-xs italic">"{pendingTranscript}"</p>
                 )}
@@ -545,8 +567,16 @@ function App() {
                 <p className="text-gray-300 font-medium mb-2">Ready for Bible guidance</p>
                 <p className="text-gray-400 text-sm mb-1">Ask for a verse or spiritual advice</p>
                 <p className="text-gray-500 text-xs">
-                  {userHasInteracted ? 'Tap the button below to speak' : 'Tap anywhere to start'}
+                  {userHasInteracted ? 
+                    (isIOS ? 'Tap the button and speak clearly' : 'Tap the button below to speak') : 
+                    'Tap anywhere to start'
+                  }
                 </p>
+                {isIOS && (
+                  <p className="text-gray-600 text-xs mt-1">
+                    iOS: Allow microphone access when prompted
+                  </p>
+                )}
               </div>
             )}
           </div>
