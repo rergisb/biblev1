@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Settings, Square } from 'lucide-react';
+import { Mic, MicOff, Settings, Square, Eye } from 'lucide-react';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ApiConfigModal } from './components/ApiConfigModal';
+import { ChatHistory } from './components/ChatHistory';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { synthesizeSpeech, playAudioBuffer, stopCurrentAudio } from './services/elevenLabsService';
 import { generateGeminiResponse } from './services/geminiService';
@@ -15,6 +16,13 @@ interface Message {
   confidence?: number;
 }
 
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  timestamp: Date;
+}
+
 function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -22,11 +30,15 @@ function App() {
   const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   const [isPlayingGreeting, setIsPlayingGreeting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState('');
   const [showApiConfig, setShowApiConfig] = useState(false);
-  const [lastResponse, setLastResponse] = useState<string>('');
+  const [showChatHistory, setShowChatHistory] = useState(false);
   const [pendingTranscript, setPendingTranscript] = useState<string>('');
   const [userHasInteracted, setUserHasInteracted] = useState(false);
+  
+  // Chat history state
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
 
   // Add ref to track if we're currently processing to prevent duplicates
   const processingRef = useRef(false);
@@ -46,6 +58,37 @@ function App() {
   useEffect(() => {
     setIsRecording(isListening);
   }, [isListening]);
+
+  // Create new session when first message is added
+  useEffect(() => {
+    if (messages.length === 1 && !currentSessionId) {
+      const newSessionId = Date.now().toString();
+      const firstUserMessage = messages.find(m => m.isUser);
+      const sessionTitle = firstUserMessage 
+        ? firstUserMessage.text.slice(0, 50) + (firstUserMessage.text.length > 50 ? '...' : '')
+        : 'New Conversation';
+      
+      setCurrentSessionId(newSessionId);
+      
+      const newSession: ChatSession = {
+        id: newSessionId,
+        title: sessionTitle,
+        messages: [...messages],
+        timestamp: new Date()
+      };
+      
+      setChatSessions(prev => [newSession, ...prev]);
+    } else if (messages.length > 0 && currentSessionId) {
+      // Update existing session
+      setChatSessions(prev => 
+        prev.map(session => 
+          session.id === currentSessionId 
+            ? { ...session, messages: [...messages], timestamp: new Date() }
+            : session
+        )
+      );
+    }
+  }, [messages, currentSessionId]);
 
   // Play welcome greeting only after user interaction (required for mobile)
   useEffect(() => {
@@ -89,13 +132,7 @@ function App() {
       // If we're not listening anymore, process the transcript immediately
       if (!isListening) {
         handleUserMessage(transcript, confidence);
-        setCurrentTranscript(transcript);
         resetTranscript();
-        
-        // Clear transcript after showing it briefly
-        setTimeout(() => {
-          setCurrentTranscript('');
-        }, 3000);
       } else {
         // Store the transcript while still listening
         setPendingTranscript(transcript);
@@ -108,16 +145,23 @@ function App() {
     if (!isListening && pendingTranscript && pendingTranscript.trim()) {
       console.log('Processing pending transcript:', pendingTranscript);
       handleUserMessage(pendingTranscript, confidence);
-      setCurrentTranscript(pendingTranscript);
       setPendingTranscript('');
       resetTranscript();
-      
-      // Clear transcript after showing it briefly
-      setTimeout(() => {
-        setCurrentTranscript('');
-      }, 3000);
     }
   }, [isListening, pendingTranscript, confidence]);
+
+  const addMessage = (text: string, isUser: boolean, confidence?: number) => {
+    const newMessage: Message = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      text,
+      isUser,
+      timestamp: new Date(),
+      confidence
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    return newMessage;
+  };
 
   const handleUserMessage = async (userText: string, confidenceScore?: number) => {
     if (!userText.trim() || processingRef.current) {
@@ -131,10 +175,12 @@ function App() {
     processingRef.current = true;
     setIsProcessing(true);
     setError(null);
-    setLastResponse('');
 
     // Stop any currently playing audio
     stopAudio();
+
+    // Add user message to chat
+    addMessage(userText, true, confidenceScore);
 
     try {
       // Add haptic feedback
@@ -147,7 +193,8 @@ function App() {
       const aiText = await generateGeminiResponse(userText);
       console.log('Gemini response:', aiText);
       
-      setLastResponse(aiText);
+      // Add AI response to chat
+      addMessage(aiText, false);
       
       // Convert AI response to speech - SINGLE CALL
       console.log('Converting to speech...');
@@ -227,8 +274,6 @@ function App() {
     }
     
     setError(null);
-    setCurrentTranscript('');
-    setLastResponse('');
     setPendingTranscript('');
     
     // Stop any currently playing audio
@@ -299,6 +344,29 @@ function App() {
     }
   };
 
+  const handleLoadSession = (session: ChatSession) => {
+    setMessages(session.messages);
+    setCurrentSessionId(session.id);
+    setShowChatHistory(false);
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    setChatSessions(prev => prev.filter(session => session.id !== sessionId));
+    
+    // If we deleted the current session, clear the current messages
+    if (sessionId === currentSessionId) {
+      setMessages([]);
+      setCurrentSessionId('');
+    }
+  };
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    setCurrentSessionId('');
+    setError(null);
+    stopAudio();
+  };
+
   // Cleanup audio on unmount
   useEffect(() => {
     return () => {
@@ -330,8 +398,26 @@ function App() {
       className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white overflow-hidden cursor-pointer"
       onClick={handleScreenTap}
     >
-      {/* Configuration Button */}
-      <div className="fixed top-6 right-6 z-20">
+      {/* Top Navigation */}
+      <div className="fixed top-6 left-6 right-6 z-20 flex justify-between items-center">
+        {/* Chat History Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowChatHistory(true);
+          }}
+          className="p-3 bg-black/20 backdrop-blur-sm border border-white/20 rounded-2xl hover:bg-black/30 transition-all duration-200 group"
+          title="View Chat History"
+        >
+          <Eye className="w-6 h-6 text-gray-300 group-hover:text-white transition-all duration-300" />
+          {messages.length > 0 && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+              <span className="text-xs text-white font-bold">{messages.length}</span>
+            </div>
+          )}
+        </button>
+
+        {/* Configuration Button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -416,16 +502,6 @@ function App() {
             </div>
           )}
 
-          {/* AI Response Display */}
-          {lastResponse && !isProcessing && !isPlayingAudio && (
-            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-violet-500/20">
-              <p className="text-gray-300 text-center mb-2">
-                <span className="text-violet-400 font-medium">Bible Companion:</span>
-              </p>
-              <p className="text-white text-sm text-center leading-relaxed">"{lastResponse}"</p>
-            </div>
-          )}
-
           {/* Status Messages */}
           <div className="text-center min-h-[60px] flex items-center justify-center">
             {isPlayingGreeting ? (
@@ -463,18 +539,6 @@ function App() {
                   <span className="text-violet-300 font-medium">🔊 Speaking God's word...</span>
                 </div>
                 <p className="text-gray-400 text-xs">Tap the center or button to stop and speak</p>
-              </div>
-            ) : currentTranscript ? (
-              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/20">
-                <p className="text-gray-300 text-center">
-                  <span className="text-purple-400 font-medium">You said:</span>
-                </p>
-                <p className="text-white mt-1 text-center">"{currentTranscript}"</p>
-                {confidence && (
-                  <p className="text-xs text-gray-500 text-center mt-1">
-                    {Math.round(confidence * 100)}% confidence
-                  </p>
-                )}
               </div>
             ) : (
               <div className="text-center">
@@ -545,6 +609,16 @@ function App() {
       <ApiConfigModal 
         isOpen={showApiConfig} 
         onClose={() => setShowApiConfig(false)} 
+      />
+
+      {/* Chat History Modal */}
+      <ChatHistory
+        isOpen={showChatHistory}
+        onClose={() => setShowChatHistory(false)}
+        sessions={chatSessions}
+        onLoadSession={handleLoadSession}
+        onDeleteSession={handleDeleteSession}
+        onNewConversation={handleNewConversation}
       />
     </div>
   );
