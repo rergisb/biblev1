@@ -114,13 +114,16 @@ export const synthesizeSpeech = async (
   }
 };
 
-// Enhanced audio playback with mobile compatibility
+// Enhanced audio playback with mobile compatibility and stop functionality
 export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
       const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
+      
+      // Store reference globally for stopping
+      (window as any).currentAudio = audio;
       
       // Enhanced mobile compatibility settings
       audio.preload = 'auto';
@@ -140,6 +143,9 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
         if (!hasEnded) {
           hasEnded = true;
           URL.revokeObjectURL(audioUrl);
+          if ((window as any).currentAudio === audio) {
+            (window as any).currentAudio = null;
+          }
         }
       };
       
@@ -164,6 +170,14 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       
       audio.onloadeddata = () => {
         console.log('Audio data loaded');
+      };
+      
+      // Handle manual stop
+      audio.onpause = () => {
+        if (!hasEnded && audio.currentTime > 0) {
+          cleanup();
+          resolve();
+        }
       };
       
       // Enhanced play with error handling for mobile
@@ -207,6 +221,16 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       reject(error);
     }
   });
+};
+
+// Function to stop currently playing audio
+export const stopCurrentAudio = (): void => {
+  const currentAudio = (window as any).currentAudio;
+  if (currentAudio && !currentAudio.paused) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    (window as any).currentAudio = null;
+  }
 };
 
 export const getAvailableVoices = async (testApiKey?: string) => {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Settings } from 'lucide-react';
+import { Mic, MicOff, Settings, Square } from 'lucide-react';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ApiConfigModal } from './components/ApiConfigModal';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
@@ -126,10 +126,7 @@ function App() {
     setLastResponse('');
 
     // Stop any currently playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    stopAudio();
 
     try {
       // Add haptic feedback
@@ -192,6 +189,16 @@ function App() {
     }
   };
 
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    setIsPlayingAudio(false);
+    setIsPlayingGreeting(false);
+  };
+
   const handleVoiceStart = () => {
     // Mark user interaction for mobile audio
     if (!userHasInteracted) {
@@ -204,11 +211,7 @@ function App() {
     setPendingTranscript('');
     
     // Stop any currently playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setIsPlayingAudio(false);
-    }
+    stopAudio();
     
     // Haptic feedback on start
     if ('vibrate' in navigator) {
@@ -226,6 +229,29 @@ function App() {
     
     console.log('Stopping voice recording...');
     stopListening();
+  };
+
+  const handleStopAudio = () => {
+    // Haptic feedback on stop
+    if ('vibrate' in navigator) {
+      navigator.vibrate([30, 20, 30]);
+    }
+    
+    console.log('Stopping audio playback...');
+    stopAudio();
+  };
+
+  const handleButtonClick = () => {
+    if (isPlayingAudio || isPlayingGreeting) {
+      // If audio is playing, stop it
+      handleStopAudio();
+    } else if (isRecording) {
+      // If recording, stop recording
+      handleVoiceStop();
+    } else {
+      // If idle, start recording
+      handleVoiceStart();
+    }
   };
 
   // Handle tap anywhere to start conversation
@@ -248,10 +274,7 @@ function App() {
   // Cleanup audio on unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      stopAudio();
     };
   }, []);
 
@@ -329,13 +352,15 @@ function App() {
                     ? 'bg-violet-500/30 animate-pulse'
                     : 'bg-gray-500/20'
                 }`}>
-                  <Mic className={`w-8 h-8 transition-colors duration-300 ${
-                    isRecording 
-                      ? 'text-purple-300' 
-                      : isPlayingAudio || isPlayingGreeting
-                      ? 'text-violet-300'
-                      : 'text-gray-400'
-                  }`} />
+                  {isPlayingAudio || isPlayingGreeting ? (
+                    <Square className={`w-6 h-6 text-violet-300 fill-current`} />
+                  ) : (
+                    <Mic className={`w-8 h-8 transition-colors duration-300 ${
+                      isRecording 
+                        ? 'text-purple-300' 
+                        : 'text-gray-400'
+                    }`} />
+                  )}
                 </div>
               </div>
             </div>
@@ -367,6 +392,7 @@ function App() {
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
                 <p className="text-violet-300 font-medium">Welcome to your Bible companion...</p>
+                <p className="text-gray-400 text-xs">Tap to stop</p>
               </div>
             ) : isRecording ? (
               <div className="space-y-2">
@@ -389,9 +415,12 @@ function App() {
                 <span className="text-violet-300 font-medium">Seeking wisdom...</span>
               </div>
             ) : isPlayingAudio ? (
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
-                <span className="text-violet-300 font-medium">🔊 Speaking God's word...</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse"></div>
+                  <span className="text-violet-300 font-medium">🔊 Speaking God's word...</span>
+                </div>
+                <p className="text-gray-400 text-xs">Tap the button to stop and speak</p>
               </div>
             ) : currentTranscript ? (
               <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/20">
@@ -420,25 +449,35 @@ function App() {
         {/* Main Interaction Button */}
         <div className="relative">
           <button
-            onClick={isRecording ? handleVoiceStop : handleVoiceStart}
-            disabled={isProcessing || isPlayingAudio || isPlayingGreeting}
+            onClick={handleButtonClick}
+            disabled={isProcessing}
             className={`relative w-20 h-20 rounded-full transition-all duration-300 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-              isRecording
+              isPlayingAudio || isPlayingGreeting
+                ? 'bg-gradient-to-r from-red-500 to-red-600 shadow-lg shadow-red-500/30 hover:shadow-red-500/40'
+                : isRecording
                 ? 'bg-gradient-to-r from-red-500 to-red-600 shadow-lg shadow-red-500/30 hover:shadow-red-500/40'
                 : 'bg-gradient-to-r from-purple-500 to-violet-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/40 hover:scale-105'
             }`}
-            aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+            aria-label={
+              isPlayingAudio || isPlayingGreeting 
+                ? 'Stop audio' 
+                : isRecording 
+                ? 'Stop recording' 
+                : 'Start recording'
+            }
           >
             {/* Glow Effect */}
             <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
-              isRecording
+              isRecording || isPlayingAudio || isPlayingGreeting
                 ? 'bg-red-500/20 animate-ping'
                 : 'bg-purple-500/20'
             }`}></div>
             
             {/* Button Content */}
             <div className="relative z-10 w-full h-full flex items-center justify-center">
-              {isRecording ? (
+              {isPlayingAudio || isPlayingGreeting ? (
+                <Square className="w-6 h-6 text-white fill-current" />
+              ) : isRecording ? (
                 <div className="w-6 h-6 bg-white rounded-sm"></div>
               ) : (
                 <Mic className="w-8 h-8 text-white" />
@@ -447,9 +486,9 @@ function App() {
           </button>
 
           {/* Pulse Ring for Active States */}
-          {(isRecording || isPlayingAudio) && (
+          {(isRecording || isPlayingAudio || isPlayingGreeting) && (
             <div className={`absolute inset-0 rounded-full animate-ping ${
-              isRecording 
+              isRecording || isPlayingAudio || isPlayingGreeting
                 ? 'bg-red-500/30' 
                 : 'bg-violet-500/30'
             }`}></div>
