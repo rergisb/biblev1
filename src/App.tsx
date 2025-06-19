@@ -51,16 +51,25 @@ function App() {
     stopListening,
     resetTranscript,
     browserSupportsSpeechRecognition,
-    confidence
+    confidence,
+    error: speechError
   } = useSpeechRecognition();
 
   // Detect iOS for special handling
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // Sync recording state with speech recognition
   useEffect(() => {
     setIsRecording(isListening);
   }, [isListening]);
+
+  // Handle speech recognition errors
+  useEffect(() => {
+    if (speechError) {
+      setError(speechError);
+    }
+  }, [speechError]);
 
   // Create new session when first message is added
   useEffect(() => {
@@ -127,37 +136,32 @@ function App() {
     }
   }, [hasPlayedGreeting, browserSupportsSpeechRecognition, userHasInteracted]);
 
-  // Handle transcript changes - iOS specific handling
+  // Handle transcript changes - simplified for better reliability
   useEffect(() => {
     if (transcript && transcript.trim()) {
-      console.log('Transcript received:', transcript, 'isListening:', isListening);
+      console.log('📝 Transcript received:', transcript, 'isListening:', isListening);
       
-      if (isIOS) {
-        // On iOS, we get final results immediately, so process them
-        console.log('iOS: Processing transcript immediately');
+      // For mobile devices, process transcript immediately when we get it
+      if (isMobile || !isListening) {
+        console.log('📱 Processing transcript immediately');
         handleUserMessage(transcript, confidence);
         resetTranscript();
       } else {
-        // Non-iOS: wait for listening to stop
-        if (!isListening) {
-          handleUserMessage(transcript, confidence);
-          resetTranscript();
-        } else {
-          setPendingTranscript(transcript);
-        }
+        // For desktop, store as pending while still listening
+        setPendingTranscript(transcript);
       }
     }
-  }, [transcript, isListening, confidence, isIOS]);
+  }, [transcript, isListening, confidence, isMobile]);
 
-  // Handle when listening stops - process any pending transcript (non-iOS)
+  // Handle when listening stops - process any pending transcript (desktop only)
   useEffect(() => {
-    if (!isIOS && !isListening && pendingTranscript && pendingTranscript.trim()) {
-      console.log('Processing pending transcript:', pendingTranscript);
+    if (!isMobile && !isListening && pendingTranscript && pendingTranscript.trim()) {
+      console.log('🖥️ Processing pending transcript:', pendingTranscript);
       handleUserMessage(pendingTranscript, confidence);
       setPendingTranscript('');
       resetTranscript();
     }
-  }, [isListening, pendingTranscript, confidence, isIOS]);
+  }, [isListening, pendingTranscript, confidence, isMobile]);
 
   const addMessage = (text: string, isUser: boolean, confidence?: number) => {
     const newMessage: Message = {
@@ -174,11 +178,11 @@ function App() {
 
   const handleUserMessage = async (userText: string, confidenceScore?: number) => {
     if (!userText.trim() || processingRef.current) {
-      console.log('Skipping message - empty or already processing');
+      console.log('⏭️ Skipping message - empty or already processing');
       return;
     }
 
-    console.log('Processing user message:', userText);
+    console.log('🔄 Processing user message:', userText);
     
     // Set processing flag to prevent duplicates
     processingRef.current = true;
@@ -197,19 +201,19 @@ function App() {
         navigator.vibrate([50, 30, 50]);
       }
       
-      // Generate AI response using Gemini - SINGLE CALL
-      console.log('Sending to Gemini:', userText);
+      // Generate AI response using Gemini
+      console.log('🤖 Sending to Gemini:', userText);
       const aiText = await generateGeminiResponse(userText);
-      console.log('Gemini response:', aiText);
+      console.log('✅ Gemini response:', aiText);
       
       // Add AI response to chat
       addMessage(aiText, false);
       
-      // Convert AI response to speech - SINGLE CALL
-      console.log('Converting to speech...');
+      // Convert AI response to speech
+      console.log('🔊 Converting to speech...');
       const audioBuffer = await synthesizeSpeech(aiText);
       
-      // Auto-play response with haptic feedback - SINGLE PLAYBACK
+      // Auto-play response with haptic feedback
       if ('vibrate' in navigator) {
         navigator.vibrate([100, 50, 100]);
       }
@@ -228,7 +232,7 @@ function App() {
         setIsPlayingAudio(false);
         audioRef.current = null;
       } catch (audioError) {
-        console.error('Audio playback failed:', audioError);
+        console.error('❌ Audio playback failed:', audioError);
         setIsPlayingAudio(false);
         audioRef.current = null;
         
@@ -241,7 +245,7 @@ function App() {
       }
       
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('❌ Error processing message:', error);
       
       // Provide more specific error messages
       if (error instanceof Error) {
@@ -294,15 +298,14 @@ function App() {
     }
     
     try {
+      console.log('🎙️ Starting voice recognition...');
       await startListening();
     } catch (error) {
-      console.error('Error starting voice recognition:', error);
+      console.error('❌ Error starting voice recognition:', error);
       if (error instanceof Error) {
-        if (error.message.includes('permission')) {
-          setError('Microphone permission is required. Please allow microphone access and try again.');
-        } else {
-          setError('Unable to start voice recognition. Please check your microphone settings.');
-        }
+        setError(error.message);
+      } else {
+        setError('Unable to start voice recognition. Please check your microphone settings.');
       }
     }
   };
@@ -313,7 +316,7 @@ function App() {
       navigator.vibrate(30);
     }
     
-    console.log('Stopping voice recording...');
+    console.log('🛑 Stopping voice recording...');
     stopListening();
   };
 
@@ -323,7 +326,7 @@ function App() {
       navigator.vibrate([30, 20, 30]);
     }
     
-    console.log('Stopping audio playback...');
+    console.log('🔇 Stopping audio playback...');
     stopAudio();
   };
 
@@ -405,9 +408,16 @@ function App() {
           <p className="text-gray-300 leading-relaxed mb-4">
             Your browser doesn't support speech recognition. Please use Chrome, Safari, or another modern browser to experience the voice assistant.
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-400 mb-4">
             On iOS, make sure you're using Safari and have microphone permissions enabled.
           </p>
+          {isMobile && (
+            <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4 mt-4">
+              <p className="text-yellow-200 text-sm">
+                📱 <strong>Mobile Tip:</strong> Make sure to allow microphone access when prompted by your browser.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -519,6 +529,11 @@ function App() {
           {error && (
             <div className="p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl">
               <p className="text-red-200 text-sm text-center">{error}</p>
+              {error.includes('permission') && isMobile && (
+                <p className="text-red-300 text-xs text-center mt-2">
+                  📱 On mobile: Check browser settings → Site permissions → Microphone
+                </p>
+              )}
             </div>
           )}
 
@@ -539,7 +554,7 @@ function App() {
                   <p className="text-purple-300 font-medium">Listening...</p>
                 </div>
                 <p className="text-gray-400 text-sm">
-                  {isIOS ? 'Speak clearly and wait for processing' : 'Share your heart or ask for guidance'}
+                  {isMobile ? 'Speak clearly and wait for processing' : 'Share your heart or ask for guidance'}
                 </p>
                 {pendingTranscript && (
                   <p className="text-purple-200 text-xs italic">"{pendingTranscript}"</p>
@@ -568,13 +583,13 @@ function App() {
                 <p className="text-gray-400 text-sm mb-1">Ask for a verse or spiritual advice</p>
                 <p className="text-gray-500 text-xs">
                   {userHasInteracted ? 
-                    (isIOS ? 'Tap the button and speak clearly' : 'Tap the button below to speak') : 
+                    (isMobile ? 'Tap the button and speak clearly' : 'Tap the button below to speak') : 
                     'Tap anywhere to start'
                   }
                 </p>
-                {isIOS && (
+                {isMobile && (
                   <p className="text-gray-600 text-xs mt-1">
-                    iOS: Allow microphone access when prompted
+                    📱 Allow microphone access when prompted
                   </p>
                 )}
               </div>
