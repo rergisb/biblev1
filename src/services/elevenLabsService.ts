@@ -18,6 +18,38 @@ export const defaultVoiceSettings: VoiceSettings = {
   use_speaker_boost: true
 };
 
+// Global audio context for better mobile support
+let audioContext: AudioContext | null = null;
+let currentAudioSource: AudioBufferSourceNode | null = null;
+
+// Initialize audio context with user interaction
+const initializeAudioContext = async (): Promise<AudioContext> => {
+  if (!audioContext) {
+    try {
+      // Use webkitAudioContext for Safari compatibility
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      audioContext = new AudioContextClass();
+      
+      // Resume context if suspended (required for mobile)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
+      console.log('✅ Audio context initialized:', audioContext.state);
+    } catch (error) {
+      console.error('❌ Failed to initialize audio context:', error);
+      throw new Error('Audio not supported on this device');
+    }
+  }
+  
+  // Ensure context is running
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume();
+  }
+  
+  return audioContext;
+};
+
 // Get API key from localStorage or fallback to default
 const getApiKey = (): string => {
   try {
@@ -114,13 +146,92 @@ export const synthesizeSpeech = async (
   }
 };
 
-// Enhanced audio playback with mobile compatibility
-export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
+// Enhanced audio playback with Web Audio API for better mobile support
+export const playAudioBuffer = async (audioBuffer: ArrayBuffer): Promise<void> => {
+  try {
+    console.log('🔊 Starting audio playback...');
+    
+    // Stop any currently playing audio
+    stopCurrentAudio();
+    
+    // Initialize audio context
+    const context = await initializeAudioContext();
+    
+    // Decode audio data
+    const decodedBuffer = await context.decodeAudioData(audioBuffer.slice(0));
+    
+    // Create audio source
+    const source = context.createBufferSource();
+    source.buffer = decodedBuffer;
+    source.connect(context.destination);
+    
+    // Store reference for stopping
+    currentAudioSource = source;
+    
+    return new Promise((resolve, reject) => {
+      let hasEnded = false;
+      
+      const cleanup = () => {
+        if (!hasEnded) {
+          hasEnded = true;
+          if (currentAudioSource === source) {
+            currentAudioSource = null;
+          }
+        }
+      };
+      
+      source.onended = () => {
+        console.log('✅ Audio playback completed');
+        cleanup();
+        resolve();
+      };
+      
+      // Handle errors
+      const handleError = (error: any) => {
+        console.error('❌ Audio playback error:', error);
+        cleanup();
+        reject(new Error('Audio playback failed'));
+      };
+      
+      try {
+        // Start playback
+        source.start(0);
+        console.log('🎵 Audio source started');
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (!hasEnded) {
+            console.warn('⏰ Audio playback timeout');
+            cleanup();
+            reject(new Error('Audio playback timeout'));
+          }
+        }, 30000);
+        
+      } catch (error) {
+        handleError(error);
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in playAudioBuffer:', error);
+    
+    // Fallback to HTML5 audio for older browsers
+    return playAudioBufferFallback(audioBuffer);
+  }
+};
+
+// Fallback HTML5 audio method
+const playAudioBufferFallback = (audioBuffer: ArrayBuffer): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
+      console.log('🔄 Using HTML5 audio fallback...');
+      
       const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
+      
+      // Store reference globally for stopping
+      (window as any).currentAudio = audio;
       
       // Enhanced mobile compatibility settings
       audio.preload = 'auto';
@@ -129,9 +240,10 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       // iOS Safari specific settings
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (isIOS) {
-        // iOS requires user interaction for audio playback
         audio.muted = false;
         audio.volume = 1.0;
+        // Force load on iOS
+        audio.load();
       }
       
       let hasEnded = false;
@@ -140,30 +252,34 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
         if (!hasEnded) {
           hasEnded = true;
           URL.revokeObjectURL(audioUrl);
+          if ((window as any).currentAudio === audio) {
+            (window as any).currentAudio = null;
+          }
         }
       };
       
       audio.onended = () => {
+        console.log('✅ HTML5 audio playback completed');
         cleanup();
         resolve();
       };
       
       audio.onerror = (error) => {
-        console.error('Audio playback error:', error);
+        console.error('❌ HTML5 audio playback error:', error);
         cleanup();
         reject(new Error('Audio playback failed'));
       };
       
+      audio.onpause = () => {
+        if (!hasEnded && audio.currentTime >= 0) {
+          console.log('🔇 Audio manually paused');
+          cleanup();
+          resolve();
+        }
+      };
+      
       audio.oncanplaythrough = () => {
-        console.log('Audio can play through');
-      };
-      
-      audio.onloadstart = () => {
-        console.log('Audio load started');
-      };
-      
-      audio.onloadeddata = () => {
-        console.log('Audio data loaded');
+        console.log('✅ Audio can play through');
       };
       
       // Enhanced play with error handling for mobile
@@ -172,16 +288,16 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('Audio playback started successfully');
+            console.log('✅ HTML5 audio playback started successfully');
           })
           .catch((error) => {
-            console.error('Audio play promise rejected:', error);
+            console.error('❌ HTML5 audio play promise rejected:', error);
             
             // Handle specific mobile errors
             if (error.name === 'NotAllowedError') {
               console.error('Audio playback not allowed - user interaction required');
               cleanup();
-              reject(new Error('Audio playback requires user interaction on this device'));
+              reject(new Error('Please tap the screen first to enable audio on your device'));
             } else if (error.name === 'NotSupportedError') {
               console.error('Audio format not supported');
               cleanup();
@@ -195,18 +311,52 @@ export const playAudioBuffer = (audioBuffer: ArrayBuffer): Promise<void> => {
       
       // Fallback timeout for mobile devices
       setTimeout(() => {
-        if (!hasEnded && audio.paused) {
-          console.warn('Audio playback timeout - forcing cleanup');
+        if (!hasEnded && audio.paused && audio.currentTime === 0) {
+          console.warn('⏰ HTML5 audio playback timeout - forcing cleanup');
           cleanup();
           reject(new Error('Audio playback timeout'));
         }
-      }, 30000); // 30 second timeout
+      }, 30000);
       
     } catch (error) {
-      console.error('Error creating audio:', error);
+      console.error('❌ Error creating HTML5 audio:', error);
       reject(error);
     }
   });
+};
+
+// Function to stop currently playing audio
+export const stopCurrentAudio = (): void => {
+  // Stop Web Audio API source
+  if (currentAudioSource) {
+    try {
+      console.log('🛑 Stopping Web Audio API source');
+      currentAudioSource.stop();
+      currentAudioSource = null;
+    } catch (error) {
+      console.log('Note: Audio source already stopped');
+      currentAudioSource = null;
+    }
+  }
+  
+  // Stop HTML5 audio fallback
+  const currentAudio = (window as any).currentAudio;
+  if (currentAudio && !currentAudio.paused) {
+    console.log('🛑 Stopping HTML5 audio');
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    (window as any).currentAudio = null;
+  }
+};
+
+// Function to ensure audio context is ready (call this on user interaction)
+export const prepareAudioContext = async (): Promise<void> => {
+  try {
+    await initializeAudioContext();
+    console.log('✅ Audio context prepared for playback');
+  } catch (error) {
+    console.error('❌ Failed to prepare audio context:', error);
+  }
 };
 
 export const getAvailableVoices = async (testApiKey?: string) => {
