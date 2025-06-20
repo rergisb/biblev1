@@ -4,7 +4,7 @@ import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ApiConfigModal } from './components/ApiConfigModal';
 import { ChatHistory } from './components/ChatHistory';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
-import { synthesizeSpeech, playAudioBuffer, stopCurrentAudio } from './services/elevenLabsService';
+import { synthesizeSpeech, playAudioBuffer, stopCurrentAudio, prepareAudioContext } from './services/elevenLabsService';
 import { generateGeminiResponse } from './services/geminiService';
 
 interface Message {
@@ -34,6 +34,7 @@ function App() {
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [pendingTranscript, setPendingTranscript] = useState<string>('');
   const [userHasInteracted, setUserHasInteracted] = useState(false);
+  const [audioContextReady, setAudioContextReady] = useState(false);
   
   // Chat history state
   const [messages, setMessages] = useState<Message[]>([]);
@@ -42,7 +43,6 @@ function App() {
 
   // Add ref to track if we're currently processing to prevent duplicates
   const processingRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
     transcript,
@@ -102,21 +102,34 @@ function App() {
     }
   }, [messages, currentSessionId]);
 
-  // Play welcome greeting only after user interaction (required for mobile)
+  // Prepare audio context on first user interaction
+  const handleFirstInteraction = async () => {
+    if (!userHasInteracted) {
+      console.log('👆 First user interaction detected');
+      setUserHasInteracted(true);
+      
+      try {
+        await prepareAudioContext();
+        setAudioContextReady(true);
+        console.log('✅ Audio context prepared');
+      } catch (error) {
+        console.error('❌ Failed to prepare audio context:', error);
+        setError('Audio initialization failed. Some features may not work properly.');
+      }
+    }
+  };
+
+  // Play welcome greeting only after user interaction and audio context is ready
   useEffect(() => {
     const playWelcomeGreeting = async () => {
-      if (hasPlayedGreeting || !browserSupportsSpeechRecognition || !userHasInteracted) return;
+      if (hasPlayedGreeting || !browserSupportsSpeechRecognition || !userHasInteracted || !audioContextReady) {
+        return;
+      }
       
       try {
         setIsPlayingGreeting(true);
         const greetingText = "Hello there! Want to read a verse or get some Bible advice? Tap the button to start.";
         const audioBuffer = await synthesizeSpeech(greetingText);
-        
-        // Store audio reference for stopping
-        const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(blob);
-        const audio = new Audio(audioUrl);
-        audioRef.current = audio;
         
         await playAudioBuffer(audioBuffer);
         setHasPlayedGreeting(true);
@@ -126,15 +139,14 @@ function App() {
         setHasPlayedGreeting(true);
       } finally {
         setIsPlayingGreeting(false);
-        audioRef.current = null;
       }
     };
 
-    if (userHasInteracted) {
+    if (userHasInteracted && audioContextReady) {
       const timer = setTimeout(playWelcomeGreeting, 1000);
       return () => clearTimeout(timer);
     }
-  }, [hasPlayedGreeting, browserSupportsSpeechRecognition, userHasInteracted]);
+  }, [hasPlayedGreeting, browserSupportsSpeechRecognition, userHasInteracted, audioContextReady]);
 
   // Handle transcript changes - simplified for better reliability
   useEffect(() => {
@@ -220,27 +232,24 @@ function App() {
       
       setIsPlayingAudio(true);
       
-      // Create and store audio reference for stopping
-      const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-      const audioUrl = URL.createObjectURL(blob);
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      
-      // Use enhanced playback with better mobile support
       try {
         await playAudioBuffer(audioBuffer);
         setIsPlayingAudio(false);
-        audioRef.current = null;
       } catch (audioError) {
         console.error('❌ Audio playback failed:', audioError);
         setIsPlayingAudio(false);
-        audioRef.current = null;
         
         // Show user-friendly error for audio issues
-        if (audioError instanceof Error && audioError.message.includes('user interaction')) {
-          setError('Please tap the screen first to enable audio on your device.');
+        if (audioError instanceof Error) {
+          if (audioError.message.includes('user interaction') || audioError.message.includes('tap the screen')) {
+            setError('Please tap the screen first to enable audio on your device.');
+          } else if (audioError.message.includes('not supported')) {
+            setError('Audio not supported on this device.');
+          } else {
+            setError('Audio playback failed. Please check your device settings.');
+          }
         } else {
-          setError('Audio playback failed. Please check your device settings.');
+          setError('Audio playback failed. Please try again.');
         }
       }
       
@@ -266,25 +275,15 @@ function App() {
   };
 
   const stopAudio = () => {
-    // Stop the global audio reference
+    // Stop the global audio
     stopCurrentAudio();
-    
-    // Stop local audio reference
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-    
     setIsPlayingAudio(false);
     setIsPlayingGreeting(false);
   };
 
   const handleVoiceStart = async () => {
-    // Mark user interaction for mobile audio
-    if (!userHasInteracted) {
-      setUserHasInteracted(true);
-    }
+    // Handle first interaction
+    await handleFirstInteraction();
     
     setError(null);
     setPendingTranscript('');
@@ -330,7 +329,10 @@ function App() {
     stopAudio();
   };
 
-  const handleButtonClick = () => {
+  const handleButtonClick = async () => {
+    // Handle first interaction
+    await handleFirstInteraction();
+    
     if (isPlayingAudio || isPlayingGreeting) {
       // If audio is playing, stop it
       handleStopAudio();
@@ -339,11 +341,14 @@ function App() {
       handleVoiceStop();
     } else {
       // If idle, start recording
-      handleVoiceStart();
+      await handleVoiceStart();
     }
   };
 
-  const handleVisualizerClick = () => {
+  const handleVisualizerClick = async () => {
+    // Handle first interaction
+    await handleFirstInteraction();
+    
     // Only handle clicks when audio is playing
     if (isPlayingAudio || isPlayingGreeting) {
       handleStopAudio();
@@ -351,18 +356,16 @@ function App() {
   };
 
   // Handle tap anywhere to start conversation
-  const handleScreenTap = (e: React.MouseEvent) => {
-    // Mark user interaction for mobile audio
-    if (!userHasInteracted) {
-      setUserHasInteracted(true);
-    }
+  const handleScreenTap = async (e: React.MouseEvent) => {
+    // Handle first interaction
+    await handleFirstInteraction();
     
     // Only trigger if not already recording/processing and not clicking the button or visualizer
     if (!isRecording && !isProcessing && !isPlayingAudio && !isPlayingGreeting) {
       const target = e.target as HTMLElement;
       // Don't trigger if clicking the actual button, config button, or visualizer
       if (!target.closest('button') && !target.closest('.voice-visualizer')) {
-        handleVoiceStart();
+        await handleVoiceStart();
       }
     }
   };
@@ -432,8 +435,9 @@ function App() {
       <div className="fixed top-6 left-6 right-6 z-20 flex justify-between items-center">
         {/* Chat History Button */}
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
+            await handleFirstInteraction();
             setShowChatHistory(true);
           }}
           className="p-3 bg-black/20 backdrop-blur-sm border border-white/20 rounded-2xl hover:bg-black/30 transition-all duration-200 group"
@@ -449,8 +453,9 @@ function App() {
 
         {/* Configuration Button */}
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
+            await handleFirstInteraction();
             setShowApiConfig(true);
           }}
           className="p-3 bg-black/20 backdrop-blur-sm border border-white/20 rounded-2xl hover:bg-black/30 transition-all duration-200 group"
@@ -529,11 +534,27 @@ function App() {
           {error && (
             <div className="p-4 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-2xl">
               <p className="text-red-200 text-sm text-center">{error}</p>
+              {error.includes('tap the screen') && (
+                <div className="mt-3 p-3 bg-blue-500/20 border border-blue-500/30 rounded-xl">
+                  <p className="text-blue-200 text-xs text-center">
+                    💡 <strong>Quick Fix:</strong> Tap anywhere on the screen, then try speaking again.
+                  </p>
+                </div>
+              )}
               {error.includes('permission') && isMobile && (
                 <p className="text-red-300 text-xs text-center mt-2">
                   📱 On mobile: Check browser settings → Site permissions → Microphone
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Audio Context Status */}
+          {userHasInteracted && !audioContextReady && (
+            <div className="p-3 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-2xl">
+              <p className="text-yellow-200 text-sm text-center">
+                🔊 Preparing audio system...
+              </p>
             </div>
           )}
 
@@ -582,14 +603,14 @@ function App() {
                 <p className="text-gray-300 font-medium mb-2">Ready for Bible guidance</p>
                 <p className="text-gray-400 text-sm mb-1">Ask for a verse or spiritual advice</p>
                 <p className="text-gray-500 text-xs">
-                  {userHasInteracted ? 
-                    (isMobile ? 'Tap the button and speak clearly' : 'Tap the button below to speak') : 
-                    'Tap anywhere to start'
+                  {!userHasInteracted ? 
+                    'Tap anywhere to start and enable audio' :
+                    (isMobile ? 'Tap the button and speak clearly' : 'Tap the button below to speak')
                   }
                 </p>
-                {isMobile && (
+                {isMobile && !userHasInteracted && (
                   <p className="text-gray-600 text-xs mt-1">
-                    📱 Allow microphone access when prompted
+                    📱 First tap enables audio and microphone
                   </p>
                 )}
               </div>
